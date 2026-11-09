@@ -1,0 +1,1494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Stream Stats Overlay Customizer</title>
+
+<!-- Optional: an "overlay-config.js" exported from the Setup tab, sitting next to this file.
+     Missing file = harmless 404. -->
+<script src="overlay-config.js" onerror="void 0"></script>
+
+<!-- ============ OVERLAY CSS (this exact block is copied into the exported overlay) ============ -->
+<style id="ovcss">
+html,body{margin:0;padding:0;background:transparent}
+body{font-family:"Segoe UI",system-ui,Arial,sans-serif}
+#ov{display:flex;flex-wrap:wrap}
+.panel{position:relative;display:flex;flex-direction:column;align-items:center}
+.panel.gone{display:none}
+.ptitle{white-space:nowrap;line-height:1.05;position:relative;z-index:4}
+.pbanner{position:relative;background-repeat:no-repeat;background-position:center;display:flex;isolation:isolate}
+.pinner{position:relative;z-index:2;flex:1;display:flex;align-items:center;gap:8px;min-width:0;overflow:hidden}
+.pvalue{white-space:nowrap;line-height:1.15;display:inline-block}
+.psub{white-space:nowrap;line-height:1.1}
+.pstack{display:flex;flex-direction:column;justify-content:center;min-width:0;flex:1;overflow:hidden}
+.pbadge{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;border-radius:4px;font-weight:800;overflow:hidden}
+.pbadge img{width:100%;height:100%;object-fit:contain;display:block}
+.ptitle.inside{position:absolute;left:0;right:0;text-align:center;pointer-events:none}
+.scrollwrap{overflow:hidden;min-width:0;flex:1}
+.scrollwrap .pvalue{will-change:transform}
+@keyframes marq{0%,10%{transform:translateX(0)}90%,100%{transform:translateX(var(--marq))}}
+@keyframes fxPop{0%{transform:scale(.55);opacity:0}60%{transform:scale(1.12);opacity:1}100%{transform:scale(1)}}
+@keyframes fxFade{0%{opacity:0}100%{opacity:1}}
+@keyframes fxUp{0%{transform:translateY(110%);opacity:0}100%{transform:translateY(0);opacity:1}}
+@keyframes fxDown{0%{transform:translateY(-110%);opacity:0}100%{transform:translateY(0);opacity:1}}
+@keyframes fxLeft{0%{transform:translateX(70%);opacity:0}100%{transform:translateX(0);opacity:1}}
+@keyframes fxRight{0%{transform:translateX(-70%);opacity:0}100%{transform:translateX(0);opacity:1}}
+@keyframes fxFlip{0%{transform:rotateX(90deg);opacity:0}100%{transform:rotateX(0);opacity:1}}
+@keyframes fxZoom{0%{transform:scale(2.2);opacity:0;filter:blur(6px)}100%{transform:scale(1);opacity:1;filter:blur(0)}}
+@keyframes fxGlitch{0%{transform:translate(0);opacity:.2}20%{transform:translate(-4px,2px)}40%{transform:translate(4px,-2px)}60%{transform:translate(-2px,-1px)}80%{transform:translate(2px,1px)}100%{transform:translate(0);opacity:1}}
+@keyframes fxFlash{0%,100%{box-shadow:none}30%{box-shadow:0 0 30px 6px var(--flash)}}
+@keyframes fxShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-5px)}40%{transform:translateX(5px)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
+@keyframes idlePulse{0%,100%{filter:brightness(1)}50%{filter:brightness(1.22)}}
+#sbchip{position:fixed;font:600 12px/1 "Segoe UI",sans-serif;padding:6px 10px;border-radius:20px;
+  background:rgba(8,12,20,.72);color:#cfe0ff;border:1px solid rgba(120,160,255,.35);z-index:99;display:none}
+#sbchip b{display:inline-block;width:8px;height:8px;border-radius:50%;background:#ef4444;margin-right:6px;vertical-align:middle}
+#sbchip.on b{background:#22c55e}
+</style>
+
+<!-- ============ EDITOR CSS (not exported) ============ -->
+<style id="uicss">
+:root{
+  --ui-bg:#0d1117; --ui-bg2:#131a24; --ui-bg3:#1a2432; --ui-line:#263141;
+  --ui-text:#dce6f5; --ui-dim:#8698b3; --ui-accent:#3b82f6; --ui-accent2:#22d3ee;
+  --ui-good:#22c55e; --ui-bad:#ef4444;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body.editing{background:var(--ui-bg);color:var(--ui-text)}
+#editor{display:none;height:100%;grid-template-rows:auto 1fr}
+body.editing #editor{display:grid}
+#stage{display:none}
+body.editing #stage{display:flex}
+.topbar{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--ui-bg2);border-bottom:1px solid var(--ui-line);flex-wrap:wrap}
+.topbar h1{font-size:15px;margin:0 8px 0 0;letter-spacing:.4px}
+.topbar h1 span{color:var(--ui-accent)}
+.spacer{flex:1}
+.btn{background:var(--ui-bg3);color:var(--ui-text);border:1px solid var(--ui-line);padding:7px 11px;border-radius:7px;cursor:pointer;font-size:12.5px;font-weight:600;font-family:inherit}
+.btn:hover{border-color:var(--ui-accent);color:#fff}
+.btn.pri{background:var(--ui-accent);border-color:var(--ui-accent);color:#fff}
+.btn.pri:hover{filter:brightness(1.12)}
+.btn.sm{padding:4px 8px;font-size:11.5px}
+.btn.danger:hover{border-color:var(--ui-bad);color:#ffb4b4}
+.main{display:grid;grid-template-columns:152px 400px 1fr;min-height:0}
+.nav{background:var(--ui-bg2);border-right:1px solid var(--ui-line);padding:10px 8px;overflow:auto}
+.nav button{display:block;width:100%;text-align:left;background:none;border:0;color:var(--ui-dim);padding:9px 10px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit}
+.nav button:hover{background:var(--ui-bg3);color:var(--ui-text)}
+.nav button.act{background:var(--ui-accent);color:#fff}
+.panelsCol{overflow:auto;padding:14px;border-right:1px solid var(--ui-line);background:var(--ui-bg)}
+.preview{overflow:auto;background:#15181d;position:relative}
+.pvbar{position:sticky;top:0;z-index:5;display:flex;gap:8px;align-items:center;padding:8px 12px;background:rgba(13,17,23,.94);border-bottom:1px solid var(--ui-line);font-size:12px;color:var(--ui-dim);flex-wrap:wrap}
+#stage{min-height:220px;padding:28px;align-items:flex-start;justify-content:center}
+#stage.checker{background-image:linear-gradient(45deg,#23272e 25%,transparent 25%),linear-gradient(-45deg,#23272e 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#23272e 75%),linear-gradient(-45deg,transparent 75%,#23272e 75%);background-size:22px 22px;background-position:0 0,0 11px,11px -11px,-11px 0}
+#stage.dark{background:#000}#stage.green{background:#00b140}#stage.shot{background:#1b2430}#stage.light{background:#dfe6ee}
+.grp{background:var(--ui-bg2);border:1px solid var(--ui-line);border-radius:10px;margin-bottom:12px;overflow:hidden}
+.grp>h3{margin:0;padding:10px 12px;font-size:12.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--ui-accent2);background:var(--ui-bg3);cursor:pointer;display:flex;justify-content:space-between}
+.grp>.body{padding:12px}
+.grp.closed>.body{display:none}
+.row{display:grid;grid-template-columns:118px 1fr;align-items:center;gap:8px;margin-bottom:9px}
+.row>label{font-size:12px;color:var(--ui-dim)}
+.row .in{display:flex;align-items:center;gap:6px}
+input[type=text],input[type=number],select,textarea{width:100%;background:var(--ui-bg);border:1px solid var(--ui-line);color:var(--ui-text);padding:6px 8px;border-radius:6px;font-size:12.5px;font-family:inherit}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--ui-accent)}
+input[type=color]{width:34px;height:28px;padding:0;border:1px solid var(--ui-line);border-radius:6px;background:var(--ui-bg);cursor:pointer}
+input[type=range]{width:100%;accent-color:var(--ui-accent)}
+input[type=checkbox]{width:16px;height:16px;accent-color:var(--ui-accent);cursor:pointer}
+.num{width:62px;flex:0 0 62px;text-align:center}
+.hint{font-size:11.5px;color:var(--ui-dim);line-height:1.55;margin:6px 0 0}
+.hint code,code{background:#0a0e14;border:1px solid var(--ui-line);padding:1px 5px;border-radius:4px;font-size:11.5px;color:#9fd0ff}
+.pcard{border:1px solid var(--ui-line);border-radius:9px;margin-bottom:10px;background:var(--ui-bg3)}
+.phead{display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer}
+.phead b{font-size:12.5px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pbody{padding:10px;border-top:1px solid var(--ui-line)}
+.pcard.closed .pbody{display:none}
+.tag{font-size:10px;padding:2px 6px;border-radius:20px;background:#0a0e14;color:var(--ui-dim);border:1px solid var(--ui-line)}
+.tag.tw{color:#c084fc;border-color:#6b21a8}.tag.ki{color:#6ee7b7;border-color:#065f46}.tag.yt{color:#fca5a5;border-color:#7f1d1d}.tag.an{color:#93c5fd;border-color:#1e40af}
+#log{font:11.5px/1.5 ui-monospace,Consolas,monospace;background:#070a0f;border:1px solid var(--ui-line);border-radius:8px;padding:8px;height:230px;overflow:auto;white-space:pre-wrap;word-break:break-word}
+#log .ev{color:#7dd3fc}#log .ok{color:#86efac}#log .er{color:#fca5a5}#log .dm{color:#64748b}
+table.data{width:100%;border-collapse:collapse;font-size:12px}
+table.data th,table.data td{border-bottom:1px solid var(--ui-line);padding:5px 4px;text-align:left}
+table.data th{color:var(--ui-dim);font-weight:600;font-size:11px;text-transform:uppercase}
+.pill{display:inline-block;padding:3px 8px;border-radius:20px;font-size:11px;background:var(--ui-bg3);border:1px solid var(--ui-line)}
+.pill.on{border-color:var(--ui-good);color:#86efac}.pill.off{border-color:var(--ui-bad);color:#fca5a5}
+.help h4{margin:16px 0 6px;font-size:13px;color:var(--ui-accent2)}
+.help p,.help li{font-size:12.5px;color:#b9c7dc;line-height:1.65}
+.help ol,.help ul{padding-left:18px;margin:6px 0}
+.help pre{background:#070a0f;border:1px solid var(--ui-line);border-radius:8px;padding:10px;overflow:auto;font-size:11.5px;color:#9fd0ff}
+.drop{border:2px dashed var(--ui-line);border-radius:8px;padding:10px;text-align:center;font-size:11.5px;color:var(--ui-dim);margin-bottom:9px}
+.drop.hot{border-color:var(--ui-accent);color:var(--ui-text)}
+.flex{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.warn{background:#2a1f09;border:1px solid #7c5a12;color:#fcd34d;padding:8px 10px;border-radius:8px;font-size:12px;line-height:1.6;margin-bottom:10px}
+/* preset gallery */
+.gal{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;max-height:440px;overflow:auto;padding:4px;background:#070a0f;border:1px solid var(--ui-line);border-radius:8px}
+.gcell{height:38px;border:1px solid transparent;border-radius:5px;overflow:hidden;cursor:pointer;position:relative;background:#0d1117}
+.gcell:hover{border-color:var(--ui-accent)}
+.gcell.sel{border-color:var(--ui-accent2);box-shadow:0 0 0 1px var(--ui-accent2)}
+.gcell .mini{width:330px;height:74px;transform:scale(.5);transform-origin:top left;position:absolute;top:0;left:0}
+.galbar{display:flex;gap:6px;margin-bottom:7px;flex-wrap:wrap}
+.galbar select{width:auto;flex:1;min-width:110px}
+</style>
+</head>
+<body>
+
+<div id="ovwrap"><div id="ov"></div></div>
+<div id="sbchip"><b></b><span>offline</span></div>
+
+<div id="editor">
+  <div class="topbar">
+    <h1>Stream Stats <span>Overlay Customizer</span></h1>
+    <span id="connPill" class="pill off">Streamer.bot: offline</span>
+    <span class="spacer"></span>
+    <button class="btn" id="btnTest">Test all</button>
+    <button class="btn pri" id="btnExportHtml">Export overlay HTML</button>
+    <button class="btn" id="btnCfgFile">overlay-config.js</button>
+    <button class="btn" id="btnUrl">Copy OBS URL</button>
+    <button class="btn" id="btnExport">Export settings</button>
+    <button class="btn" id="btnImport">Import</button>
+    <button class="btn danger" id="btnReset">Reset</button>
+    <button class="btn pri" id="btnSave">Save</button>
+  </div>
+  <div class="main">
+    <div class="nav">
+      <button data-tab="panels" class="act">Panels</button>
+      <button data-tab="fonts">Fonts</button>
+      <button data-tab="title">Title text</button>
+      <button data-tab="value">Value text</button>
+      <button data-tab="banner">Banner</button>
+      <button data-tab="designs">Banner designs</button>
+      <button data-tab="layout">Layout</button>
+      <button data-tab="fx">Effects</button>
+      <button data-tab="conn">Streamer.bot</button>
+      <button data-tab="data">Live data</button>
+      <button data-tab="setup">Setup / Help</button>
+    </div>
+    <div class="panelsCol" id="controls"></div>
+    <div class="preview">
+      <div class="pvbar">
+        <span>Preview bg:</span>
+        <select id="pvbg" style="width:110px">
+          <option value="checker">Transparent</option>
+          <option value="dark">Black</option>
+          <option value="shot">Dark grey</option>
+          <option value="light">Light</option>
+          <option value="green">Green</option>
+        </select>
+        <span class="spacer"></span>
+        <span id="pvsize" style="font-family:ui-monospace,monospace"></span>
+      </div>
+      <div id="stage" class="checker"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= ENGINE (copied verbatim into the exported overlay) ======================= -->
+<script id="engine">
+(function(){
+"use strict";
+
+var QS = new URLSearchParams(location.search);
+var HS = new URLSearchParams((location.hash||"").replace(/^#/,""));
+function q(k){ return QS.get(k)!==null ? QS.get(k) : HS.get(k); }
+var EXPORTED  = !!window.OVERLAY_EXPORT;
+var inOBS     = !!window.obsstudio;
+var forceEdit = q("edit")!==null;
+var forceOver = q("overlay")!==null;
+var MODE = EXPORTED ? "overlay" : (forceEdit ? "edit" : ((forceOver||inOBS) ? "overlay" : "edit"));
+
+var CFG_KEY="ssOverlay.config.v1", DATA_KEY="ssOverlay.data.v1";
+
+/* ------------------------------- lists ------------------------------- */
+var PLATFORMS=[
+ {id:"twitch",name:"Twitch",short:"TW",color:"#9146FF",cls:"tw"},
+ {id:"kick",name:"Kick",short:"KICK",color:"#53FC18",cls:"ki"},
+ {id:"youtube",name:"YouTube",short:"YT",color:"#FF0033",cls:"yt"},
+ {id:"any",name:"Any platform",short:"LIVE",color:"#3b82f6",cls:"an"}];
+var STATS=[
+ {id:"follower",name:"Latest follower",fmt:"{name}"},
+ {id:"subscriber",name:"Latest subscriber",fmt:"{name}"},
+ {id:"giftsub",name:"Latest gifter",fmt:"{name} x{amount}"},
+ {id:"cheer",name:"Latest cheer / bits",fmt:"{name} - {amount}"},
+ {id:"raid",name:"Latest raid / host",fmt:"{name} ({amount})"},
+ {id:"superchat",name:"Latest super chat",fmt:"{name} {amount}"},
+ {id:"donation",name:"Latest tip / donation",fmt:"{name} {amount}"},
+ {id:"viewers",name:"Viewer count",fmt:"{amount}"},
+ {id:"chatter",name:"Latest chatter",fmt:"{name}"},
+ {id:"custom",name:"Custom (Streamer.bot broadcast)",fmt:"{name}"}];
+
+var WINDOWS_FONTS=["Arial","Arial Black","Arial Narrow","Bahnschrift","Bahnschrift Condensed","Bahnschrift SemiBold","Bell MT","Book Antiqua","Bookman Old Style","Bradley Hand ITC","Britannic Bold","Broadway","Calibri","Calibri Light","Cambria","Cambria Math","Candara","Castellar","Centaur","Century","Century Gothic","Century Schoolbook","Chiller","Colonna MT","Comic Sans MS","Consolas","Constantia","Cooper Black","Copperplate Gothic Bold","Copperplate Gothic Light","Corbel","Courier New","Curlz MT","Ebrima","Elephant","Engravers MT","Eras Bold ITC","Felix Titling","Footlight MT Light","Forte","Franklin Gothic Book","Franklin Gothic Heavy","Franklin Gothic Medium","Freestyle Script","French Script MT","Gabriola","Gadugi","Garamond","Georgia","Gigi","Gill Sans MT","Gloucester MT Extra Condensed","Goudy Old Style","Goudy Stout","Haettenschweiler","Harlow Solid Italic","Harrington","High Tower Text","Impact","Imprint MT Shadow","Informal Roman","Ink Free","Javanese Text","Jokerman","Juice ITC","Kristen ITC","Kunstler Script","Leelawadee UI","Lucida Bright","Lucida Calligraphy","Lucida Console","Lucida Fax","Lucida Handwriting","Lucida Sans","Lucida Sans Typewriter","Lucida Sans Unicode","Magneto","Maiandra GD","Malgun Gothic","Matura MT Script Capitals","Microsoft Himalaya","Microsoft JhengHei","Microsoft New Tai Lue","Microsoft PhagsPa","Microsoft Sans Serif","Microsoft Tai Le","Microsoft YaHei","Mistral","Modern No. 20","Mongolian Baiti","Monotype Corsiva","MS Gothic","MS PGothic","MS Reference Sans Serif","MS UI Gothic","MV Boli","Myanmar Text","Niagara Engraved","Niagara Solid","Nirmala UI","OCR A Extended","Old English Text MT","Onyx","Palace Script MT","Palatino Linotype","Papyrus","Parchment","Perpetua","Perpetua Titling MT","Playbill","Poor Richard","Pristina","Rage Italic","Ravie","Rockwell","Rockwell Condensed","Rockwell Extra Bold","Script MT Bold","Segoe Print","Segoe Script","Segoe UI","Segoe UI Black","Segoe UI Light","Segoe UI Semibold","Segoe UI Semilight","Showcard Gothic","SimSun","Sitka Banner","Sitka Display","Sitka Heading","Snap ITC","Stencil","Sylfaen","Tahoma","Tempus Sans ITC","Times New Roman","Trebuchet MS","Tw Cen MT","Tw Cen MT Condensed","Verdana","Viner Hand ITC","Vivaldi","Vladimir Script","Wide Latin","Yu Gothic","Yu Gothic UI"];
+
+var GOOGLE_FONTS=["ABeeZee","Abel","Abril Fatface","Acme","Advent Pro","Alfa Slab One","Alegreya","Alegreya Sans","Allerta Stencil","Almendra Display","Amatic SC","Amaranth","Anonymous Pro","Anton","Antonio","Archivo","Archivo Black","Archivo Narrow","Arimo","Arvo","Asap","Asap Condensed","Assistant","Audiowide","Bai Jamjuree","Baloo 2","Bangers","Barlow","Barlow Condensed","Barlow Semi Condensed","Barriecito","Baskervville","Battambang","Be Vietnam Pro","Bebas Neue","Belanosima","Bellota","Benne","Bevan","Big Shoulders Display","Bigelow Rules","Bilbo","Bitter","Black Han Sans","Black Ops One","Blaka","Bodoni Moda","Bokor","Bowlby One","Bowlby One SC","Bree Serif","Bruno Ace","Bruno Ace SC","Bungee","Bungee Inline","Bungee Outline","Bungee Shade","Bungee Spice","Cabin","Cabin Condensed","Cairo","Calistoga","Candal","Cantarell","Carter One","Caveat","Caveat Brush","Changa","Changa One","Charm","Chau Philomene One","Chelsea Market","Chewy","Chivo","Chonburi","Cinzel","Cinzel Decorative","Comfortaa","Coming Soon","Commissioner","Concert One","Contrail One","Cookie","Copse","Corben","Cormorant","Cormorant Garamond","Courgette","Courier Prime","Creepster","Crete Round","Crimson Pro","Crimson Text","Cuprum","Cutive Mono","DM Mono","DM Sans","DM Serif Display","DM Serif Text","Damion","Dancing Script","Days One","Dela Gothic One","Della Respira","Dosis","Dotgothic16","Duru Sans","EB Garamond","Eczar","Economica","Electrolize","Encode Sans","Engagement","Epilogue","Exo","Exo 2","Explora","Fahkwang","Familjen Grotesk","Faster One","Fasthand","Faustina","Federo","Figtree","Finger Paint","Fira Code","Fira Mono","Fira Sans","Fira Sans Condensed","Fjalla One","Flamenco","Fondamento","Fontdiner Swanky","Forum","Francois One","Frank Ruhl Libre","Fredericka the Great","Fredoka","Freehand","Fugaz One","Fuggles","GFS Didot","Gabarito","Gafata","Galada","Galdeano","Gelasio","Gemunu Libre","Geologica","Georama","Geostar","Germania One","Gideon Roman","Gilda Display","Girassol","Give You Glory","Glass Antiqua","Glegoo","Gloria Hallelujah","Glory","Gluten","Goblin One","Gochi Hand","Goldman","Gorditas","Gothic A1","Gotu","Goudy Bookletter 1911","Gowun Dodum","Graduate","Grand Hotel","Grandstander","Grape Nuts","Gravitas One","Great Vibes","Grechen Fuemen","Grenze","Grenze Gotisch","Grey Qo","Griffy","Gruppo","Gudea","Gugi","Gulzar","Gupter","Gurajada","Habibi","Hachi Maru Pop","Hahmlet","Halant","Hammersmith One","Hanalei","Hanalei Fill","Handlee","Hanken Grotesk","Hanuman","Happy Monkey","Harmattan","Headland One","Heebo","Henny Penny","Hepta Slab","Herr Von Muellerhoff","Hi Melody","Hina Mincho","Hind","Hind Siliguri","Holtwood One SC","Homemade Apple","Homenaje","IBM Plex Mono","IBM Plex Sans","IBM Plex Sans Condensed","IBM Plex Serif","IM Fell English","Iceberg","Iceland","Imbue","Imprima","Inconsolata","Inder","Indie Flower","Inknut Antiqua","Inria Sans","Inspiration","Instrument Sans","Inter","Inter Tight","Irish Grover","Island Moments","Istok Web","Italiana","Italianno","Itim","Jacques Francois","Jaldi","JetBrains Mono","Jim Nightshade","Joan","Jockey One","Jolly Lodger","Jomhuria","Josefin Sans","Josefin Slab","Jost","Joti One","Jua","Judson","Julee","Julius Sans One","Junge","Jura","Just Another Hand","Kablammo","Kadwa","Kalam","Kanit","Kantumruy Pro","Karla","Karma","Katibeh","Kaushan Script","Kavoon","Keania One","Kelly Slab","Kenia","Khand","Khula","Kings","Kirang Haerang","Kite One","Kiwi Maru","Klee One","Knewave","KoHo","Kodchasan","Kosugi Maru","Koulen","Kranky","Kreon","Kristi","Krona One","Krub","Kufam","Kumar One","Kumbh Sans","Kurale","La Belle Aurore","Labrada","Lacquer","Laila","Lakki Reddy","Lalezar","Lancelot","Langar","Lateef","Lato","League Gothic","League Script","League Spartan","Leckerli One","Ledger","Lekton","Lemon","Lemonada","Lexend","Lexend Deca","Libre Barcode 39","Libre Baskerville","Libre Bodoni","Libre Caslon Display","Libre Franklin","Licorice","Life Savers","Lilita One","Lily Script One","Limelight","Linden Hill","Literata","Liu Jian Mao Cao","Livvic","Lobster","Lobster Two","Londrina Outline","Londrina Shadow","Londrina Solid","Long Cang","Lora","Love Light","Love Ya Like A Sister","Luckiest Guy","Lusitana","Lustria","Luxurious Roman","Luxurious Script","M PLUS 1p","M PLUS Rounded 1c","Ma Shan Zheng","Macondo","Mada","Magra","Maiden Orange","Maitree","Major Mono Display","Mako","Mali","Mallanna","Mandali","Manjari","Manrope","Mansalva","Manuale","Marcellus","Marck Script","Margarine","Markazi Text","Marko One","Marmelad","Martel","Marvel","Mate","Maven Pro","McLaren","Mea Culpa","Meddon","Medula One","Meera Inimai","Megrim","Meie Script","Merienda","Merriweather","Merriweather Sans","Metal Mania","Metamorphous","Metrophobic","Michroma","Milonga","Miltonian","Mina","Miniver","Miriam Libre","Mirza","Miss Fajardose","Mitr","Mochiy Pop One","Modak","Modern Antiqua","Mogra","Mohave","Molengo","Molle","Monda","Monofett","Monoton","Monsieur La Doulaise","Montaga","Montagu Slab","MonteCarlo","Montez","Montserrat","Montserrat Alternates","Moo Lah Lah","Moon Dance","Moul","Mountains of Christmas","Mouse Memoirs","Mr Bedfort","Mr Dafoe","Mrs Saint Delafield","Mukta","Mulish","Murecho","MuseoModerno","My Soul","Mystery Quest","Nabla","Nanum Brush Script","Nanum Gothic","Nanum Myeongjo","Nanum Pen Script","Neonderthaw","Nerko One","Neucha","Neuton","New Rocker","News Cycle","Newsreader","Niconne","Niramit","Nixie One","Nobile","Nokora","Norican","Nosifer","Notable","Nothing You Could Do","Noticia Text","Noto Sans","Noto Sans Display","Noto Sans Mono","Noto Serif","Nova Flat","Nova Mono","Nova Round","Nova Square","Numans","Nunito","Nunito Sans","Odibee Sans","Odor Mean Chey","Offside","Oi","Old Standard TT","Oldenburg","Oleo Script","Oleo Script Swash Caps","Onest","Oooh Baby","Open Sans","Oranienbaum","Orbit","Orbitron","Oregano","Orelega One","Orienta","Original Surfer","Oswald","Otomanopee One","Outfit","Over the Rainbow","Overlock","Overpass","Overpass Mono","Ovo","Oxanium","Oxygen","Oxygen Mono","PT Mono","PT Sans","PT Sans Narrow","PT Serif","Pacifico","Padauk","Palanquin","Pangolin","Paprika","Parisienne","Passero One","Passion One","Passions Conflict","Pathway Gothic One","Patrick Hand","Pattaya","Patua One","Pavanam","Paytone One","Peddana","Peralta","Permanent Marker","Petit Formal Script","Petrona","Philosopher","Piazzolla","Piedra","Pinyon Script","Pirata One","Plaster","Play","Playball","Playfair Display","Plus Jakarta Sans","Podkova","Poiret One","Poller One","Poltawski Nowy","Poly","Pompiere","Pontano Sans","Poor Story","Poppins","Port Lligat Sans","Potta One","Pragati Narrow","Praise","Prata","Preahvihear","Press Start 2P","Pridi","Princess Sofia","Prociono","Prompt","Prosto One","Proza Libre","Public Sans","Puppies Play","Puritan","Purple Purse","Qahiri","Quando","Quantico","Quattrocento","Quattrocento Sans","Questrial","Quicksand","Quintessential","Qwigley","Qwitcher Grypen","Racing Sans One","Radio Canada","Radley","Rajdhani","Rakkas","Raleway","Ramabhadra","Ramaraja","Rambla","Rammetto One","Rampart One","Ranchers","Rancho","Ranga","Rasa","Rationale","Ravi Prakash","Readex Pro","Recursive","Red Hat Display","Red Hat Mono","Red Hat Text","Red Rose","Redacted Script","Redressed","Reem Kufi","Reenie Beanie","Reggae One","Revalia","Rhodium Libre","Ribeye","Ribeye Marrow","Righteous","Risque","Road Rage","Roboto","Roboto Condensed","Roboto Flex","Roboto Mono","Roboto Serif","Roboto Slab","Rochester","Rock 3D","Rock Salt","RocknRoll One","Rokkitt","Romanesco","Ropa Sans","Rosario","Rosarivo","Rouge Script","Rowdies","Rozha One","Rubik","Rubik Bubbles","Rubik Dirt","Rubik Glitch","Rubik Iso","Rubik Mono One","Rubik Moonrocks","Rubik Puddles","Rubik Wet Paint","Ruda","Rufina","Ruge Boogie","Ruluko","Rum Raisin","Ruslan Display","Russo One","Ruthie","Rye","STIX Two Text","Sacramento","Sahitya","Sail","Saira","Saira Condensed","Saira Extra Condensed","Saira Stencil One","Salsa","Sanchez","Sancreek","Sansita","Sansita Swashed","Sarabun","Sarala","Sarina","Sarpanch","Satisfy","Sawarabi Gothic","Sawarabi Mincho","Scada","Scheherazade New","Schoolbell","Scope One","Seaweed Script","Secular One","Sedgwick Ave","Sedgwick Ave Display","Sen","Sevillana","Seymour One","Shadows Into Light","Shalimar","Shantell Sans","Share","Share Tech","Share Tech Mono","Shippori Mincho","Shojumaru","Short Stack","Shrikhand","Siemreap","Sigmar","Sigmar One","Signika","Signika Negative","Silkscreen","Simonetta","Single Day","Sintony","Sirin Stencil","Six Caps","Skranji","Slabo 27px","Slackey","Smokum","Smooch","Smythe","Sniglet","Snippet","Snowburst One","Sofadi One","Sofia","Sofia Sans","Solitreo","Solway","Sono","Sonsie One","Sora","Sorts Mill Goudy","Source Code Pro","Source Sans 3","Source Serif 4","Space Grotesk","Space Mono","Special Elite","Spectral","Spicy Rice","Spinnaker","Spirax","Splash","Spline Sans","Squada One","Sree Krushnadevaraya","Sriracha","Srisakdi","Staatliches","Stalemate","Stalinist One","Stardos Stencil","Stick","Stick No Bills","Stint Ultra Condensed","Stint Ultra Expanded","Stoke","Strait","Style Script","Stylish","Sue Ellen Francisco","Suez One","Sulphur Point","Sumana","Sunflower","Sunshiney","Supermercado One","Sura","Suranna","Suravaram","Suwannaphum","Swanky and Moo Moo","Syncopate","Syne","Syne Mono","Syne Tactile","Tajawal","Tangerine","Tapestry","Taprom","Tauri","Taviraj","Teko","Tektur","Telex","Tenali Ramakrishna","Tenor Sans","Text Me One","Texturina","Thasadith","The Girl Next Door","The Nautigal","Tienne","Tillana","Tilt Neon","Tilt Prism","Tilt Warp","Timmana","Tinos","Tiro Devanagari Hindi","Titan One","Titillium Web","Tomorrow","Tourney","Trade Winds","Train One","Trirong","Trispace","Trocchi","Trochut","Truculenta","Trykker","Tsukimi Rounded","Tulpen One","Turret Road","Twinkle Star","Ubuntu","Ubuntu Condensed","Ubuntu Mono","Uchen","Ultra","Uncial Antiqua","Underdog","Unica One","UnifrakturMaguntia","Unkempt","Unlock","Unna","Updock","Urbanist","VT323","Vampiro One","Varela","Varela Round","Varta","Vast Shadow","Vazirmatn","Vesper Libre","Viaoda Libre","Vibes","Vibur","Victor Mono","Vidaloka","Viga","Vina Sans","Voces","Volkhov","Vollkorn","Voltaire","Vujahday Script","Waiting for the Sunrise","Wallpoet","Walter Turncoat","Warnes","Water Brush","Waterfall","Wellfleet","Wendy One","Whisper","WindSong","Wire One","Work Sans","Xanh Mono","Yaldevi","Yanone Kaffeesatz","Yantramanav","Yatra One","Yellowtail","Yeon Sung","Yeseva One","Yesteryear","Yomogi","Young Serif","Yrsa","Ysabeau","Yuji Boku","Yuji Syuku","Yusei Magic","ZCOOL KuaiLe","ZCOOL QingKe HuangYou","ZCOOL XiaoWei","Zen Antique","Zen Dots","Zen Kaku Gothic New","Zen Loop","Zen Maru Gothic","Zen Old Mincho","Zen Tokyo Zoo","Zeyada","Zhi Mang Xing","Zilla Slab","Zilla Slab Highlight"];
+
+/* ------------------------- banner design presets ------------------------- */
+var SHAPES=[
+ {id:"rect",   name:"Rectangle",     clip:"",                                                                                                                  r:0},
+ {id:"round",  name:"Rounded",       clip:"",                                                                                                                  r:10},
+ {id:"pill",   name:"Pill",          clip:"",                                                                                                                  r:999},
+ {id:"bevel",  name:"Bevel",         clip:"polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px)",                                 r:0},
+ {id:"cut4",   name:"Cut corners",   clip:"polygon(10px 0,calc(100% - 10px) 0,100% 10px,100% calc(100% - 10px),calc(100% - 10px) 100%,10px 100%,0 calc(100% - 10px),0 10px)", r:0},
+ {id:"slant",  name:"Slanted",       clip:"polygon(16px 0,100% 0,calc(100% - 16px) 100%,0 100%)",                                                               r:0},
+ {id:"trap",   name:"Trapezoid",     clip:"polygon(0 0,100% 0,calc(100% - 20px) 100%,20px 100%)",                                                               r:0},
+ {id:"hex",    name:"Hex",           clip:"polygon(18px 0,calc(100% - 18px) 0,100% 50%,calc(100% - 18px) 100%,18px 100%,0 50%)",                                r:0},
+ {id:"arrow",  name:"Arrow",         clip:"polygon(0 0,calc(100% - 22px) 0,100% 50%,calc(100% - 22px) 100%,0 100%)",                                            r:0},
+ {id:"chev",   name:"Chevron",       clip:"polygon(0 0,calc(100% - 18px) 0,100% 50%,calc(100% - 18px) 100%,0 100%,18px 50%)",                                   r:0},
+ {id:"flag",   name:"Flag notch",    clip:"polygon(0 0,100% 0,calc(100% - 20px) 50%,100% 100%,0 100%)",                                                         r:0},
+ {id:"tag",    name:"Ticket",        clip:"polygon(0 0,100% 0,100% 100%,0 100%,0 70%,8px 50%,0 30%)",                                                           r:0},
+ {id:"notchtr",name:"Notch top",     clip:"polygon(0 0,calc(100% - 26px) 0,100% 26px,100% 100%,0 100%)",                                                        r:0},
+ {id:"wedge",  name:"Double wedge",  clip:"polygon(22px 0,calc(100% - 22px) 0,100% 100%,0 100%)",                                                               r:0}
+];
+var THEMES=[
+ {id:"nebula", name:"Blue nebula",  f:["#4f8cff","#0b2a7a"], b:["#0a1330","#16244f"], g:"#1d4ed8"},
+ {id:"ember",  name:"Ember",        f:["#ffb020","#e8420a"], b:["#2a0b05","#120403"], g:"#ff5a1f"},
+ {id:"toxic",  name:"Toxic green",  f:["#9dff4a","#0f8a00"], b:["#07140a","#0d2412"], g:"#53fc18"},
+ {id:"royal",  name:"Royal purple", f:["#c084fc","#4c1d95"], b:["#160a2b","#0b0518"], g:"#9146ff"},
+ {id:"crimson",name:"Crimson",      f:["#ff5470","#7f1020"], b:["#1a0509","#2a0b12"], g:"#ef4444"},
+ {id:"cyber",  name:"Cyber cyan",   f:["#67e8f9","#0369a1"], b:["#041824","#07263a"], g:"#22d3ee"},
+ {id:"gold",   name:"Gold",         f:["#ffe066","#b8860b"], b:["#1a1405","#0d0a02"], g:"#facc15"},
+ {id:"steel",  name:"Steel",        f:["#e2e8f0","#475569"], b:["#10161f","#1c232d"], g:"#94a3b8"},
+ {id:"rose",   name:"Rose",         f:["#fda4af","#9d174d"], b:["#1b0712","#2a0c1c"], g:"#fb7185"},
+ {id:"mint",   name:"Mint",         f:["#6ee7b7","#065f46"], b:["#04150f","#082119"], g:"#34d399"},
+ {id:"sunset", name:"Sunset",       f:["#fb923c","#db2777"], b:["#1d0a12","#280d16"], g:"#f97316"},
+ {id:"vapor",  name:"Vaporwave",    f:["#ff71ce","#01cdfe"], b:["#140a26","#0a1430"], g:"#ff71ce"},
+ {id:"carbon", name:"Carbon",       f:["#475569","#0f172a"], b:["#0a0f17","#131a24"], g:"#000000"},
+ {id:"ice",    name:"Ice",          f:["#e0f2fe","#38bdf8"], b:["#071a28","#0b2437"], g:"#7dd3fc"}
+];
+function presetList(){
+  var out=[];
+  for(var s=0;s<SHAPES.length;s++) for(var t=0;t<THEMES.length;t++)
+    out.push({ id:SHAPES[s].id+"|"+THEMES[t].id, shape:SHAPES[s], theme:THEMES[t],
+               name:SHAPES[s].name+" · "+THEMES[t].name });
+  return out;
+}
+function findPreset(id){
+  var parts=String(id||"").split("|");
+  var s=SHAPES.filter(function(x){return x.id===parts[0];})[0];
+  var t=THEMES.filter(function(x){return x.id===parts[1];})[0];
+  if(!s||!t) return null;
+  return {id:id, shape:s, theme:t, name:s.name+" · "+t.name};
+}
+/* css for a preset: returns {outer, after}. `custom` overrides the theme colours. */
+function presetCSS(p, frame, radius, custom){
+  if(!p) return null;
+  var sh=p.shape, th=p.theme;
+  var f0=th.f[0], f1=th.f[1], b0=th.b[0], b1=th.b[1];
+  if(custom && custom.on){ f0=custom.f1; f1=custom.f2; b0=custom.b1; b1=custom.b2; }
+  var r = (radius!==undefined && radius!==null) ? radius : sh.r;
+  var outer = "background-image:linear-gradient("+(custom&&custom.on?custom.angle:170)+"deg,"+f0+","+f1+");"+
+              "background-size:auto;background-color:transparent;"+
+              (sh.clip? "clip-path:"+sh.clip+";" : "")+
+              "border-radius:"+r+"px;";
+  var after = "content:'';position:absolute;inset:"+frame+"px;z-index:1;"+
+              (sh.clip? "clip-path:"+sh.clip+";" : "")+
+              "border-radius:"+Math.max(0,r-1)+"px;"+
+              "background-image:linear-gradient(180deg,"+b0+","+b1+");";
+  return {outer:outer, after:after};
+}
+
+/* ------------------------------ defaults ------------------------------ */
+function mkPanel(i,platform,stat,label){
+  return {id:"p"+i,on:true,platform:platform,stat:stat,label:label,fmt:"",showAmount:true,
+          banner:"",preset:"",titleColor:"",valueColor:"",w:0,h:0};
+}
+var DEFAULTS={
+ v:2, savedAt:0,
+ layout:{dir:"row",cols:2,gap:36,align:"center",pad:16,scale:1,wrap:true},
+ banner:{mode:"image", src:"banner_background.png", preset:"bevel|nebula", frame:3,
+         custom:{on:false,f1:"#4f8cff",f2:"#0b2a7a",b1:"#0a1330",b2:"#16244f",angle:170},
+         w:330,h:74,fit:"100% 100%",radius:6,pl:24,pr:24,pt:8,pb:8,opacity:1,
+         bg:"#0b142e",bgOn:false,bw:0,bc:"#3b82f6",glow:14,glowColor:"#05070d",glowOn:true},
+ title:{on:true,pos:"above",font:"Impact",size:26,weight:800,color:"#2f6bff",grad:false,
+        color2:"#9ad0ff",outline:3,outlineColor:"#ffffff",glow:9,glowColor:"#0a2a7a",
+        ls:1,upper:true,skew:0,gap:4,offset:0},
+ value:{font:"Segoe UI",size:22,weight:700,color:"#ffffff",grad:false,color2:"#8ec5ff",
+        outline:0,outlineColor:"#000000",glow:8,glowColor:"#2a6bff",ls:0,upper:false,
+        skew:0,align:"center",overflow:"shrink",minSize:11},
+ sub:{on:false,mode:"detail",size:12,color:"#9fb6e8",opacity:0.85,gap:2},
+ badge:{mode:"none",size:20,pos:"left",img:{twitch:"twitch.png",kick:"kick.png",youtube:"youtube.png",any:""}},
+ fx:{anim:"pop",dur:650,flash:true,flashColor:"#ffffff",idle:false,shake:false},
+ behavior:{idleText:"—",hideEmpty:false,showChip:false,chipPos:"bottom-right",keepOffline:true,bakeValues:true},
+ conn:{enabled:true,url:"ws://127.0.0.1:8080/",password:"",reconnect:true,reconnectMs:4000},
+ font:{google:true,customName:"",customFile:"",extra:""},
+ maps:[], seed:{},
+ panels:[mkPanel(1,"any","follower","Latest Follower"),
+         mkPanel(2,"any","subscriber","Latest Subscriber"),
+         mkPanel(3,"any","cheer","Latest Cheer"),
+         mkPanel(4,"any","raid","Latest Raid")]
+};
+
+function clone(o){ return JSON.parse(JSON.stringify(o)); }
+function deepMerge(base,over){
+  var out=clone(base);
+  if(!over||typeof over!=="object") return out;
+  Object.keys(over).forEach(function(k){
+    var b=out[k],o=over[k];
+    if(Array.isArray(o)) out[k]=clone(o);
+    else if(o&&typeof o==="object"&&b&&typeof b==="object"&&!Array.isArray(b)) out[k]=deepMerge(b,o);
+    else if(o!==undefined) out[k]=o;
+  });
+  return out;
+}
+function b64e(obj){ return btoa(unescape(encodeURIComponent(JSON.stringify(obj)))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,""); }
+function b64d(s){ try{ var b=s.replace(/-/g,"+").replace(/_/g,"/"); while(b.length%4)b+="="; return JSON.parse(decodeURIComponent(escape(atob(b)))); }catch(e){ return null; } }
+function lsGet(k){ try{ return JSON.parse(localStorage.getItem(k)||"null"); }catch(e){ return null; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); return true; }catch(e){ return false; } }
+
+var cfg = (function(){
+  if(EXPORTED) return deepMerge(DEFAULTS, window.OVERLAY_CONFIG||{});
+  var u = q("cfg") ? b64d(q("cfg")) : null;
+  if(u) return deepMerge(DEFAULTS,u);
+  var ls=lsGet(CFG_KEY), file=(typeof window.OVERLAY_CONFIG==="object"&&window.OVERLAY_CONFIG)?window.OVERLAY_CONFIG:null;
+  var pick = (ls&&file) ? (((file.savedAt||0)>=(ls.savedAt||0))?file:ls) : (ls||file);
+  return deepMerge(DEFAULTS, pick||{});
+})();
+
+var DATA = lsGet(DATA_KEY) || {stats:{},meta:{lastOnline:0,lastSeen:0}};
+if(!DATA.stats) DATA.stats={};
+if(!DATA.meta) DATA.meta={lastOnline:0,lastSeen:0};
+function saveData(){ lsSet(DATA_KEY,DATA); }
+function statKey(p,s){ return p+":"+s; }
+
+var hooks = { log:null, conn:null, data:null };
+
+function setStat(stat,platform,vars,opts){
+  opts=opts||{};
+  var now=Date.now(), keys=[statKey(platform,stat)];
+  if(platform!=="any") keys.push(statKey("any",stat));
+  keys.forEach(function(k){
+    var prev=DATA.stats[k], hist=(prev&&prev.history?prev.history.slice(-9):[]);
+    if(prev&&prev.vars&&prev.vars.name) hist.push({vars:prev.vars,ts:prev.ts,platform:prev.platform});
+    DATA.stats[k]={vars:vars,ts:now,platform:platform,history:hist.slice(-10)};
+  });
+  saveData();
+  paintValues({stat:stat, force:!!opts.force});
+  if(hooks.data) hooks.data();
+}
+function getStat(p,s){ return DATA.stats[statKey(p,s)]||null; }
+
+/* ------------------------- event data extraction ------------------------- */
+function gp(o,path){ if(!o) return undefined; var a=path.split("."),c=o;
+  for(var i=0;i<a.length;i++){ if(c==null) return undefined; c=c[a[i]]; } return c; }
+function firstStr(o,paths){
+  for(var i=0;i<paths.length;i++){ var v=gp(o,paths[i]);
+    if(typeof v==="string"&&v.trim()!=="") return v.trim();
+    if(typeof v==="number") return String(v); }
+  return undefined;
+}
+var NAME_KEYS=["displayName","display_name","userName","user_name","name","username","login","user_login","nickname","slug"];
+var SKIP_KEYS=["broadcaster","channel","targetchannel","to_broadcaster","hostchannel","emotes","message","meta","rewards","badges"];
+function deepName(o,d){
+  d=d||0; if(!o||typeof o!=="object"||d>4) return undefined;
+  for(var i=0;i<NAME_KEYS.length;i++){ var v=o[NAME_KEYS[i]];
+    if(typeof v==="string"&&v.trim()!=="") return v.trim(); }
+  var ks=Object.keys(o);
+  for(var j=0;j<ks.length;j++){
+    if(SKIP_KEYS.indexOf(ks[j].toLowerCase())>=0) continue;
+    var val=o[ks[j]];
+    if(val&&typeof val==="object"){ var r=deepName(val,d+1); if(r) return r; }
+  }
+  return undefined;
+}
+function extractName(data){
+  return firstStr(data,[
+   "user.displayName","user.display_name","user.name","user.username","user.login","user.userName",
+   "sender.displayName","sender.name","sender.username","sender.login",
+   "gifter.displayName","gifter.name","gifter.username",
+   "subscriber.displayName","subscriber.name","subscriber.username",
+   "follower.displayName","follower.name","follower.username",
+   "from.displayName","from.name","from.username","author.displayName","author.name",
+   "displayName","display_name","userName","user_name","username","login","user_login","name",
+   "from_broadcaster_user_name","from_broadcaster_user_login",
+   "targetUser.displayName","targetUser.name","targetUser.login",
+   "recipient.displayName","recipient.name","recipient.username"]) || deepName(data) || "";
+}
+function numOf(v){ var n=parseFloat(v); return isNaN(n)?undefined:n; }
+function money(data){
+  var amt=gp(data,"amount");
+  if(amt&&typeof amt==="object"){
+    var val=amt.amount!==undefined?amt.amount:(amt.value!==undefined?amt.value:amt.total);
+    var cur=amt.currency||amt.currencyCode||"";
+    if(val!==undefined) return (cur?cur+" ":"")+val;
+  }
+  var s=firstStr(data,["amountString","formattedAmount","displayString","amountDisplay","purchaseAmount"]);
+  if(s) return s;
+  var n=numOf(amt!==undefined?amt:gp(data,"value"));
+  if(n!==undefined){ var c=firstStr(data,["currency","currencyCode"])||""; return (c?c+" ":"$")+n; }
+  return "";
+}
+function buildVars(stat,data){
+  var v={name:extractName(data),amount:"",detail:"",months:"",tier:"",message:""};
+  var bits=numOf(gp(data,"bits"));
+  var viewers=numOf(firstStr(data,["viewers","viewerCount","viewer_count","viewersCount","concurrentViewers"]));
+  var months=numOf(firstStr(data,["cumulative_months","cumulativeMonths","totalMonths","duration_months","months","monthsSubscribed","streak"]));
+  var tier=firstStr(data,["sub_tier","subTier","tier","subscriptionTier","memberLevelName","membershipLevel"]);
+  var total=numOf(firstStr(data,["totalCount","total","gifts","giftCount","quantity","count"]));
+  var msg=firstStr(data,["message","text","comment","messageText"]);
+  if(months!==undefined) v.months=String(months);
+  if(tier) v.tier=String(tier).replace(/^(\d)000$/,"$1");
+  if(msg) v.message=msg;
+  switch(stat){
+    case "cheer": v.amount=(bits!==undefined?bits+" bits":money(data)); break;
+    case "raid": v.amount=(viewers!==undefined?viewers+" viewers":""); break;
+    case "giftsub": v.amount=(total!==undefined?total:1); break;
+    case "subscriber": v.amount=(v.months?v.months+" mo":(v.tier?"Tier "+v.tier:"")); break;
+    case "superchat": case "donation": v.amount=money(data); break;
+    case "viewers": v.amount=(viewers!==undefined?viewers:(total!==undefined?total:"")); break;
+    default: v.amount=(total!==undefined?total:"");
+  }
+  v.detail=String(v.amount||"");
+  return v;
+}
+var EVENT_MAP={
+ "Twitch.Follow":{s:"follower",p:"twitch"},"Twitch.Sub":{s:"subscriber",p:"twitch"},
+ "Twitch.ReSub":{s:"subscriber",p:"twitch"},"Twitch.Subscription":{s:"subscriber",p:"twitch"},
+ "Twitch.GiftSub":{s:"giftsub",p:"twitch"},"Twitch.GiftBomb":{s:"giftsub",p:"twitch"},
+ "Twitch.Cheer":{s:"cheer",p:"twitch"},"Twitch.Raid":{s:"raid",p:"twitch"},
+ "Twitch.ChatMessage":{s:"chatter",p:"twitch"},"Twitch.FirstWords":{s:"chatter",p:"twitch"},
+ "Twitch.CharityDonation":{s:"donation",p:"twitch"},"Twitch.PresentViewers":{s:"viewers",p:"twitch"},
+ "Kick.Follow":{s:"follower",p:"kick"},"Kick.Subscription":{s:"subscriber",p:"kick"},
+ "Kick.Resubscription":{s:"subscriber",p:"kick"},"Kick.GiftSubscription":{s:"giftsub",p:"kick"},
+ "Kick.MassGiftSubscription":{s:"giftsub",p:"kick"},"Kick.sGifted":{s:"giftsub",p:"kick"},
+ "Kick.RewardRedemption":{s:"custom",p:"kick"},"Kick.ChatMessage":{s:"chatter",p:"kick"},
+ "Kick.FirstWords":{s:"chatter",p:"kick"},"Kick.ViewerCountUpdate":{s:"viewers",p:"kick"},
+ "Kick.PresentViewers":{s:"viewers",p:"kick"},
+ "YouTube.NewSubscriber":{s:"follower",p:"youtube"},"YouTube.NewSponsor":{s:"subscriber",p:"youtube"},
+ "YouTube.MemberMileStone":{s:"subscriber",p:"youtube"},"YouTube.MembershipGift":{s:"giftsub",p:"youtube"},
+ "YouTube.GiftMembershipReceived":{s:"subscriber",p:"youtube"},"YouTube.SuperChat":{s:"superchat",p:"youtube"},
+ "YouTube.SuperSticker":{s:"superchat",p:"youtube"},"YouTube.JewelsGifted":{s:"donation",p:"youtube"},
+ "YouTube.Message":{s:"chatter",p:"youtube"},"YouTube.FirstWords":{s:"chatter",p:"youtube"},
+ "YouTube.StatisticsUpdated":{s:"viewers",p:"youtube"},"YouTube.PresentViewers":{s:"viewers",p:"youtube"},
+ "Streamlabs.Donation":{s:"donation",p:"any"},"StreamElements.Tip":{s:"donation",p:"any"},
+ "TipeeeStream.Donation":{s:"donation",p:"any"},"DonorDrive.Donation":{s:"donation",p:"any"}};
+function subscriptionPayload(){
+  var tw=[],ki=[],yt=[],sl=[],se=[];
+  Object.keys(EVENT_MAP).forEach(function(f){
+    var a=f.split("."),src=a[0],t=a[1];
+    if(src==="Twitch")tw.push(t); else if(src==="Kick")ki.push(t); else if(src==="YouTube")yt.push(t);
+    else if(src==="Streamlabs")sl.push(t); else if(src==="StreamElements")se.push(t);
+  });
+  (cfg.maps||[]).forEach(function(m){
+    if(!m||!m.event) return; var a=m.event.split("."),src=a[0],t=a[1]; if(!t) return;
+    if(src==="Twitch"&&tw.indexOf(t)<0)tw.push(t);
+    if(src==="Kick"&&ki.indexOf(t)<0)ki.push(t);
+    if(src==="YouTube"&&yt.indexOf(t)<0)yt.push(t);
+  });
+  return {"Twitch":tw,"twitch":tw,"Kick":ki,"kick":ki,"YouTube":yt,"youTube":yt,"youtube":yt,
+          "Streamlabs":sl,"streamlabs":sl,"StreamElements":se,"streamElements":se,
+          "General":["Custom"],"general":["Custom"]};
+}
+
+/* ------------------------------- sha256 ------------------------------- */
+var SHA_K=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+function utf8Bytes(s){
+  var o=[],i,c;
+  for(i=0;i<s.length;i++){ c=s.charCodeAt(i);
+    if(c<128)o.push(c);
+    else if(c<2048)o.push(192|(c>>6),128|(c&63));
+    else if(c<55296||c>=57344)o.push(224|(c>>12),128|((c>>6)&63),128|(c&63));
+    else { i++; var cc=65536+(((c&1023)<<10)|(s.charCodeAt(i)&1023));
+           o.push(240|(cc>>18),128|((cc>>12)&63),128|((cc>>6)&63),128|(cc&63)); } }
+  return o;
+}
+function sha256b64(msg){
+  var H=[0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+  var by=utf8Bytes(msg), bit=by.length*8; by=by.slice(); by.push(0x80);
+  while(by.length%64!==56) by.push(0);
+  var hi=Math.floor(bit/4294967296), lo=bit>>>0;
+  by.push((hi>>>24)&255,(hi>>>16)&255,(hi>>>8)&255,hi&255,(lo>>>24)&255,(lo>>>16)&255,(lo>>>8)&255,lo&255);
+  var w=new Array(64),i,t;
+  function rr(x,n){ return (x>>>n)|(x<<(32-n)); }
+  for(i=0;i<by.length;i+=64){
+    for(t=0;t<16;t++) w[t]=(by[i+t*4]<<24)|(by[i+t*4+1]<<16)|(by[i+t*4+2]<<8)|by[i+t*4+3];
+    for(t=16;t<64;t++){
+      var s0=rr(w[t-15],7)^rr(w[t-15],18)^(w[t-15]>>>3);
+      var s1=rr(w[t-2],17)^rr(w[t-2],19)^(w[t-2]>>>10);
+      w[t]=(w[t-16]+s0+w[t-7]+s1)|0;
+    }
+    var a=H[0],b=H[1],c=H[2],d=H[3],e=H[4],f=H[5],g=H[6],h=H[7];
+    for(t=0;t<64;t++){
+      var S1=rr(e,6)^rr(e,11)^rr(e,25), ch=(e&f)^((~e)&g);
+      var t1=(h+S1+ch+SHA_K[t]+w[t])|0;
+      var S0=rr(a,2)^rr(a,13)^rr(a,22), mj=(a&b)^(a&c)^(b&c);
+      var t2=(S0+mj)|0;
+      h=g;g=f;f=e;e=(d+t1)|0;d=c;c=b;b=a;a=(t1+t2)|0;
+    }
+    H[0]=(H[0]+a)|0;H[1]=(H[1]+b)|0;H[2]=(H[2]+c)|0;H[3]=(H[3]+d)|0;
+    H[4]=(H[4]+e)|0;H[5]=(H[5]+f)|0;H[6]=(H[6]+g)|0;H[7]=(H[7]+h)|0;
+  }
+  var out=[]; for(i=0;i<8;i++) out.push((H[i]>>>24)&255,(H[i]>>>16)&255,(H[i]>>>8)&255,H[i]&255);
+  var bin=""; for(i=0;i<out.length;i++) bin+=String.fromCharCode(out[i]);
+  return btoa(bin);
+}
+function log(m,c){ if(hooks.log) hooks.log(m,c||"dm"); }
+
+/* --------------------------- Streamer.bot client --------------------------- */
+var SB={
+ ws:null,connected:false,authed:false,timer:null,hb:null,manualClose:false,
+ connect:function(){
+   if(!cfg.conn.enabled) return;
+   this.manualClose=false;
+   try{ if(this.ws){ this.ws.onclose=null; this.ws.close(); } }catch(e){}
+   var url=(cfg.conn.url||"ws://127.0.0.1:8080/").trim(), self=this, ws;
+   log("connecting to "+url,"dm");
+   try{ ws=new WebSocket(url); }catch(e){ log("bad websocket url: "+e.message,"er"); return; }
+   this.ws=ws;
+   ws.onopen=function(){
+     self.connected=true; self.authed=false;
+     DATA.meta.lastOnline=Date.now(); DATA.meta.lastSeen=Date.now(); saveData();
+     log("connected","ok"); if(hooks.conn) hooks.conn(true); paintChip();
+     self.send({request:"GetInfo",id:"info"});
+     setTimeout(function(){ if(self.connected&&!self.authed) self.subscribe(); },150);
+     self.hb=setInterval(function(){ if(self.connected){ DATA.meta.lastSeen=Date.now(); saveData(); paintChip(); } },15000);
+   };
+   ws.onclose=function(){
+     self.connected=false; if(hooks.conn) hooks.conn(false); paintChip();
+     if(self.hb){ clearInterval(self.hb); self.hb=null; }
+     log("disconnected","er");
+     if(cfg.conn.reconnect&&!self.manualClose){
+       clearTimeout(self.timer);
+       self.timer=setTimeout(function(){ SB.connect(); }, Math.max(1000,cfg.conn.reconnectMs|0));
+     }
+   };
+   ws.onerror=function(){};
+   ws.onmessage=function(ev){ self.onMessage(ev.data); };
+ },
+ disconnect:function(){ this.manualClose=true; clearTimeout(this.timer); try{ if(this.ws) this.ws.close(); }catch(e){} },
+ send:function(o){ try{ if(this.ws&&this.ws.readyState===1) this.ws.send(JSON.stringify(o)); }catch(e){} },
+ subscribe:function(){
+   this.send({request:"Subscribe",id:"sub-"+Date.now(),events:subscriptionPayload()});
+   log("subscribed to Twitch / Kick / YouTube events","ok");
+ },
+ authenticate:function(auth){
+   var pw=cfg.conn.password||"";
+   if(!pw){ log("server wants a password but none is set","er"); this.subscribe(); return; }
+   var secret=sha256b64(pw+(auth.salt||""));
+   this.send({request:"Authenticate",authentication:sha256b64(secret+(auth.challenge||"")),id:"auth"});
+ },
+ onMessage:function(raw){
+   var msg; try{ msg=JSON.parse(raw); }catch(e){ return; }
+   if(msg.request==="Hello"||(msg.info&&msg.authentication&&!msg.event)){
+     if(msg.authentication){ this.authenticate(msg.authentication); return; }
+     this.subscribe(); return;
+   }
+   if(msg.id==="auth"){
+     if(msg.status==="ok"){ this.authed=true; log("authenticated","ok"); }
+     else log("auth failed: "+(msg.error||"check the password"),"er");
+     this.subscribe(); return;
+   }
+   if(msg.status&&!msg.event) return;
+   if(handleCustomPayload(msg)) return;
+   if(!msg.event||!msg.event.source) return;
+   var src=msg.event.source, type=msg.event.type, full=src+"."+type, data=msg.data||{};
+   if(src.toLowerCase()==="general"){
+     var inner=data;
+     if(typeof inner==="string"){ try{ inner=JSON.parse(inner); }catch(e){ inner=null; } }
+     if(inner&&handleCustomPayload(inner)) return;
+   }
+   var hit=EVENT_MAP[full]||EVENT_MAP[src.charAt(0).toUpperCase()+src.slice(1)+"."+type];
+   var custom=(cfg.maps||[]).filter(function(m){ return m.event===full; })[0];
+   if(hooks.log) hooks.log((hit||custom?"":"(unmapped) ")+full+(extractName(data)?"  ->  "+extractName(data):""), (hit||custom)?"ev":"dm");
+   if(custom){
+     var vars=buildVars(custom.stat||"custom",data);
+     if(custom.namePath){ var n=gp(data,custom.namePath); if(n!=null&&String(n)!=="") vars.name=String(n); }
+     if(custom.amountPath){ var a=gp(data,custom.amountPath); if(a!=null){ vars.amount=String(a); vars.detail=String(a); } }
+     setStat(custom.stat||"custom",custom.platform||guessPlatform(src),vars);
+     return;
+   }
+   if(!hit) return;
+   setStat(hit.s,hit.p,buildVars(hit.s,data));
+ }
+};
+function guessPlatform(src){
+  var s=(src||"").toLowerCase();
+  if(s.indexOf("twitch")>=0) return "twitch";
+  if(s.indexOf("kick")>=0) return "kick";
+  if(s.indexOf("you")>=0) return "youtube";
+  return "any";
+}
+function handleCustomPayload(o){
+  if(!o||typeof o!=="object") return false;
+  if(!(o.ssbOverlay||o.ssboverlay||o.statsOverlay)||!o.stat) return false;
+  setStat(String(o.stat), String(o.platform||"any").toLowerCase(), {
+    name:String(o.name||""), amount:(o.amount!==undefined?String(o.amount):""),
+    detail:String(o.detail!==undefined?o.detail:(o.amount!==undefined?o.amount:"")),
+    months:String(o.months||""), tier:String(o.tier||""), message:String(o.message||"")});
+  log("custom payload -> "+o.stat,"ok");
+  return true;
+}
+
+/* ------------------------------ rendering ------------------------------ */
+var ovEl=document.getElementById("ov");
+var dynStyle=document.createElement("style"); document.head.appendChild(dynStyle);
+var fontLink=document.createElement("link"); fontLink.rel="stylesheet";
+var lastTxt={}, lastSub={};
+
+function neededFonts(){
+  var out=[];
+  [cfg.title.font,cfg.value.font].forEach(function(f){ if(GOOGLE_FONTS.indexOf(f)>=0&&out.indexOf(f)<0) out.push(f); });
+  String(cfg.font.extra||"").split(",").forEach(function(f){
+    f=f.trim(); if(f&&out.indexOf(f)<0) out.push(f);
+  });
+  return out;
+}
+function applyFonts(){
+  var f=neededFonts();
+  if(cfg.font.google&&f.length){
+    var href="https://fonts.googleapis.com/css2?"+f.map(function(n){
+      return "family="+encodeURIComponent(n).replace(/%20/g,"+")+":wght@400;700;900"; }).join("&")+"&display=swap";
+    if(fontLink.href!==href) fontLink.href=href;
+    if(!fontLink.parentNode) document.head.appendChild(fontLink);
+  }
+}
+function fontStack(n){ return '"'+n+'", Impact, "Arial Black", sans-serif'; }
+function textFX(t,colorOverride){
+  var c=colorOverride||t.color, css="";
+  css+="font-family:"+fontStack(t.font)+";font-size:"+t.size+"px;font-weight:"+t.weight+";";
+  css+="letter-spacing:"+t.ls+"px;text-transform:"+(t.upper?"uppercase":"none")+";";
+  if(t.skew) css+="transform:skewX("+(-t.skew)+"deg);";
+  if(t.grad){
+    css+="background-image:linear-gradient(180deg,"+c+","+t.color2+");";
+    css+="-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;";
+    if(t.glow>0) css+="filter:drop-shadow(0 0 "+t.glow+"px "+t.glowColor+") drop-shadow(0 0 "+(t.glow*2)+"px "+t.glowColor+");";
+  }else{
+    css+="color:"+c+";";
+    if(t.glow>0) css+="text-shadow:0 0 "+t.glow+"px "+t.glowColor+",0 0 "+(t.glow*2)+"px "+t.glowColor+";";
+  }
+  if(t.outline>0) css+="-webkit-text-stroke:"+t.outline+"px "+t.outlineColor+";paint-order:stroke fill;";
+  return css;
+}
+function panelBanner(p){
+  var b=cfg.banner;
+  var w=(p&&p.w>0)?p.w:b.w, h=(p&&p.h>0)?p.h:b.h;
+  var src = (p&&p.banner) ? p.banner : (b.mode==="image" ? b.src : "");
+  var presetId = (p&&p.preset) ? p.preset : b.preset;
+  var usePreset = !src;
+  var css="width:"+w+"px;height:"+h+"px;opacity:"+b.opacity+";";
+  var after="";
+  if(usePreset){
+    var pr=presetCSS(findPreset(presetId), b.frame, b.radius, b.custom);
+    if(pr){ css+=pr.outer; after=pr.after; }
+    else { css+="border-radius:"+b.radius+"px;background-color:"+b.bg+";"; }
+  }else{
+    css+='background-image:url("'+String(src).replace(/"/g,'\\"')+'");background-size:'+b.fit+";border-radius:"+b.radius+"px;";
+    if(b.bgOn) css+="background-color:"+b.bg+";";
+  }
+  if(b.bw>0) css+="border:"+b.bw+"px solid "+b.bc+";";
+  if(b.glowOn&&b.glow>0) css+="filter:drop-shadow(0 0 "+b.glow+"px "+b.glowColor+");";
+  return {css:css, after:after};
+}
+function buildCSS(){
+  var L=cfg.layout,B=cfg.banner,T=cfg.title,V=cfg.value,S=cfg.sub,css="";
+  if(cfg.font.customName&&cfg.font.customFile)
+    css+='@font-face{font-family:"'+cfg.font.customName+'";src:url("'+cfg.font.customFile+'");font-display:swap}';
+  css+="#ov{";
+  if(L.dir==="grid") css+="display:grid;grid-template-columns:repeat("+Math.max(1,L.cols)+",max-content);";
+  else css+="display:flex;flex-direction:"+(L.dir==="column"?"column":"row")+";"+(L.wrap?"flex-wrap:wrap;":"flex-wrap:nowrap;");
+  css+="gap:"+L.gap+"px;align-items:"+L.align+";justify-content:"+L.align+";padding:"+L.pad+"px;";
+  css+="transform:scale("+L.scale+");transform-origin:top left;width:max-content;}";
+  css+=".ptitle{"+textFX(T)+"margin-bottom:"+T.gap+"px;}";
+  css+=".ptitle.inside{top:"+T.offset+"px;margin:0;}";
+  var gb=panelBanner(null);
+  css+=".pbanner{"+gb.css+"}";
+  if(gb.after) css+=".pbanner::after{"+gb.after+"}";
+  css+=".pinner{padding:"+B.pt+"px "+B.pr+"px "+B.pb+"px "+B.pl+"px;justify-content:"+
+       (V.align==="left"?"flex-start":V.align==="right"?"flex-end":"center")+";}";
+  css+=".pstack{align-items:"+(V.align==="left"?"flex-start":V.align==="right"?"flex-end":"center")+";gap:"+S.gap+"px;}";
+  css+=".scrollwrap{width:100%;text-align:"+V.align+";}";
+  css+=".pvalue{"+textFX(V)+"}";
+  css+=".psub{font-family:"+fontStack(V.font)+";font-size:"+S.size+"px;color:"+S.color+";opacity:"+S.opacity+";font-weight:600;}";
+  css+=".pbadge{width:"+cfg.badge.size+"px;height:"+cfg.badge.size+"px;font-size:"+Math.round(cfg.badge.size*0.5)+"px;color:#fff}";
+  if(cfg.badge.pos==="right") css+=".pinner{flex-direction:row-reverse}";
+  if(cfg.fx.idle) css+=".pbanner{animation:idlePulse 3.2s ease-in-out infinite}";
+  var cp=cfg.behavior.chipPos;
+  css+="#sbchip{"+((cp.indexOf("top")===0)?"top:10px;":"bottom:10px;")+((cp.indexOf("left")>=0)?"left:10px;":"right:10px;")+"}";
+  (cfg.panels||[]).forEach(function(p){
+    var sel='.panel[data-pid="'+p.id+'"] ';
+    if(p.banner||p.preset||p.w>0||p.h>0){
+      var pb=panelBanner(p);
+      css+=sel+".pbanner{"+pb.css+"}";
+      css+=sel+".pbanner::after{"+(pb.after||"content:none")+"}";
+    }
+    if(p.titleColor) css+=sel+".ptitle{"+textFX(T,p.titleColor)+"margin-bottom:"+T.gap+"px;}";
+    if(p.valueColor) css+=sel+".pvalue{"+textFX(V,p.valueColor)+"}";
+  });
+  return css;
+}
+function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function badgeHTML(platform){
+  var m=cfg.badge.mode; if(m==="none") return "";
+  var pl=PLATFORMS.filter(function(x){return x.id===platform;})[0]||PLATFORMS[3];
+  if(m==="dot") return '<span class="pbadge" style="background:'+pl.color+';border-radius:50%"></span>';
+  if(m==="text") return '<span class="pbadge" style="background:'+pl.color+';width:auto;padding:2px 6px">'+esc(pl.short||pl.name)+'</span>';
+  if(m==="image"){ var s=cfg.badge.img[platform]||""; return s?'<span class="pbadge"><img src="'+esc(s)+'" alt=""></span>':""; }
+  return "";
+}
+function renderOverlay(){
+  applyFonts();
+  dynStyle.textContent=buildCSS();
+  var html="";
+  (cfg.panels||[]).forEach(function(p){
+    if(!p.on) return;
+    var title='<div class="ptitle'+(cfg.title.pos==="inside"?" inside":"")+'">'+esc(p.label||"")+"</div>";
+    if(!cfg.title.on||cfg.title.pos==="hidden") title="";
+    var inner='<div class="pbanner">'+(cfg.title.pos==="inside"?title:"")+
+      '<div class="pinner">'+badgeHTML(p.platform)+
+        '<div class="pstack"><div class="scrollwrap"><span class="pvalue"></span></div>'+
+        (cfg.sub.on?'<span class="psub"></span>':'')+'</div></div></div>';
+    html+='<div class="panel" data-pid="'+p.id+'">'+
+      ((cfg.title.pos==="below")?inner+title:(cfg.title.pos==="above"?title+inner:inner))+'</div>';
+  });
+  ovEl.innerHTML=html;
+  paintValues({relayout:true});
+}
+function fmtTemplate(tpl,vars){
+  return String(tpl).replace(/\{(\w+)\}/g,function(_,k){ return String(vars&&vars[k]!==undefined?vars[k]:""); })
+    .replace(/\(\s*\)|\[\s*\]/g,"").replace(/\s{2,}/g," ")
+    .replace(/^[\s\-–—|,:]+|[\s\-–—|,:]+$/g,"").trim();
+}
+/* drops {amount} and whatever wraps it, so "{name} ({amount})" becomes "{name}" */
+function stripAmount(tpl){
+  var out=String(tpl).replace(/[\s\-–—|,:]*[\(\[]?\s*\{amount\}\s*[\)\]]?/g,"").trim();
+  return out.indexOf("{")>=0 ? out : tpl;   /* never blank the whole line */
+}
+function panelTemplate(p){
+  var def=STATS.filter(function(s){ return s.id===p.stat; })[0]||STATS[0];
+  var tpl=p.fmt||def.fmt;
+  return (p.showAmount===false) ? stripAmount(tpl) : tpl;
+}
+function timeAgo(ts){
+  if(!ts) return "never";
+  var s=Math.max(0,Math.floor((Date.now()-ts)/1000));
+  if(s<60) return s+"s ago";
+  var m=Math.floor(s/60); if(m<60) return m+"m ago";
+  var h=Math.floor(m/60); if(h<24) return h+"h ago";
+  return Math.floor(h/24)+"d ago";
+}
+/* opts: {stat, force, relayout} — the effect only plays when the shown text actually changes */
+function paintValues(opts){
+  opts=opts||{};
+  (cfg.panels||[]).forEach(function(p){
+    if(!p.on) return;
+    if(opts.stat && p.stat!==opts.stat) return;
+    var el=ovEl.querySelector('.panel[data-pid="'+p.id+'"]'); if(!el) return;
+    var rec=getStat(p.platform,p.stat);
+    var vars=rec?rec.vars:(cfg.seed[statKey(p.platform,p.stat)]||null);
+    var vEl=el.querySelector(".pvalue"), sEl=el.querySelector(".psub");
+    var txt=vars?fmtTemplate(panelTemplate(p),vars):"";
+    if(!txt) txt=cfg.behavior.idleText||"";
+
+    var known = Object.prototype.hasOwnProperty.call(lastTxt,p.id);
+    var changed = known && lastTxt[p.id]!==txt;
+    lastTxt[p.id]=txt;
+    if(vEl.textContent!==txt) vEl.textContent=txt;
+
+    if(sEl){
+      var det = (p.showAmount===false) ? "" : (vars?(vars.detail||""):"");
+      var sub = (cfg.sub.mode==="detail") ? det
+              : (cfg.sub.mode==="timeago") ? (rec?timeAgo(rec.ts):"")
+              : [det, rec&&timeAgo(rec.ts)].filter(Boolean).join(" · ");
+      if(sEl.textContent!==sub) sEl.textContent=sub;
+    }
+    el.classList.toggle("gone", !!(cfg.behavior.hideEmpty&&!vars));
+
+    /* an "any platform" panel shows the badge of whichever platform the value came from */
+    if(cfg.badge.mode!=="none"&&p.platform==="any"){
+      var want=(rec&&rec.platform)?rec.platform:"any";
+      if(el.getAttribute("data-badge")!==want){
+        var holder=el.querySelector(".pinner"), old=el.querySelector(".pbadge"), bh=badgeHTML(want);
+        if(old) old.outerHTML=bh||"";
+        else if(bh&&holder) holder.insertAdjacentHTML("afterbegin",bh);
+        el.setAttribute("data-badge",want);
+      }
+    }
+
+    if(changed||opts.relayout||opts.force) fitText(vEl);
+    if(changed||opts.force) playFX(el,vEl);
+  });
+  paintChip();
+}
+function fitText(vEl){
+  var V=cfg.value;
+  vEl.style.animation="";
+  vEl.style.fontSize=V.size+"px";
+  var wrap=vEl.parentNode;
+  if(V.overflow==="clip"){ vEl.style.textOverflow="ellipsis"; vEl.style.overflow="hidden"; vEl.style.display="block"; return; }
+  vEl.style.textOverflow=""; vEl.style.overflow=""; vEl.style.display="inline-block";
+  var avail=wrap.clientWidth; if(!avail) return;
+  if(V.overflow==="shrink"){
+    var size=V.size,guard=0;
+    while(vEl.scrollWidth>avail&&size>(V.minSize||10)&&guard++<80){ size-=1; vEl.style.fontSize=size+"px"; }
+  }else if(V.overflow==="scroll"){
+    if(vEl.scrollWidth>avail+2){
+      vEl.style.setProperty("--marq", -(vEl.scrollWidth-avail+6)+"px");
+      vEl.style.animation="marq "+Math.max(6,(vEl.scrollWidth/26))+"s linear infinite alternate";
+    }
+  }
+}
+function playFX(panelEl,vEl){
+  var fx=cfg.fx;
+  var map={pop:"fxPop",fade:"fxFade",up:"fxUp",down:"fxDown",left:"fxLeft",right:"fxRight",flip:"fxFlip",zoom:"fxZoom",glitch:"fxGlitch"};
+  if(fx.anim!=="none"&&map[fx.anim]){
+    var keep=vEl.style.animation;
+    vEl.style.animation="none"; void vEl.offsetWidth;
+    vEl.style.animation=map[fx.anim]+" "+(fx.dur||600)+"ms cubic-bezier(.2,.9,.25,1)";
+    if(cfg.value.overflow==="scroll"&&keep&&keep.indexOf("marq")>=0)
+      setTimeout(function(){ vEl.style.animation=keep; },(fx.dur||600)+30);
+  }
+  var b=panelEl.querySelector(".pbanner");
+  if(b&&(fx.flash||fx.shake)){
+    var anims=[];
+    if(fx.flash){ b.style.setProperty("--flash",fx.flashColor); anims.push("fxFlash "+(fx.dur||600)+"ms ease-out"); }
+    if(fx.shake) anims.push("fxShake "+Math.min(600,(fx.dur||600))+"ms ease-in-out");
+    b.style.animation="none"; void b.offsetWidth;
+    b.style.animation=anims.join(",");
+    if(cfg.fx.idle) setTimeout(function(){ b.style.animation="idlePulse 3.2s ease-in-out infinite"; },(fx.dur||600)+40);
+  }
+}
+var chipEl=document.getElementById("sbchip");
+function paintChip(){
+  if(!chipEl) return;
+  if(!cfg.behavior.showChip||MODE!=="overlay"){ chipEl.style.display="none"; return; }
+  chipEl.style.display="block";
+  chipEl.classList.toggle("on",SB.connected);
+  chipEl.querySelector("span").textContent = SB.connected ? "Streamer.bot live"
+    : ("Streamer.bot offline · last seen "+timeAgo(DATA.meta.lastSeen||DATA.meta.lastOnline));
+}
+setInterval(function(){
+  if(cfg.sub.on&&cfg.sub.mode!=="detail") paintValues({});
+  else paintChip();
+},30000);
+window.addEventListener("storage",function(e){
+  if(e.key===DATA_KEY&&e.newValue){
+    try{ DATA=JSON.parse(e.newValue); paintValues({}); if(hooks.data) hooks.data(); }catch(err){}
+  }
+});
+window.addEventListener("resize",function(){ paintValues({relayout:true}); });
+
+/* -------------------------------- boot -------------------------------- */
+Object.keys(cfg.seed||{}).forEach(function(k){
+  if(!DATA.stats[k]) DATA.stats[k]={vars:cfg.seed[k],ts:0,platform:k.split(":")[0],history:[]};
+});
+if(MODE==="edit" && document.getElementById("editor")) document.body.classList.add("editing");
+renderOverlay();
+if(cfg.conn.enabled) SB.connect();
+
+window.SSO={
+ MODE:MODE, EXPORTED:EXPORTED, CFG_KEY:CFG_KEY, DATA_KEY:DATA_KEY,
+ PLATFORMS:PLATFORMS, STATS:STATS, WINDOWS_FONTS:WINDOWS_FONTS, GOOGLE_FONTS:GOOGLE_FONTS,
+ SHAPES:SHAPES, THEMES:THEMES, presetList:presetList, findPreset:findPreset, presetCSS:presetCSS,
+ DEFAULTS:DEFAULTS, mkPanel:mkPanel, clone:clone, deepMerge:deepMerge, b64e:b64e, b64d:b64d,
+ lsSet:lsSet, lsGet:lsGet, hooks:hooks, SB:SB, timeAgo:timeAgo, statKey:statKey,
+ getStat:getStat, setStat:setStat, saveData:saveData,
+ renderOverlay:renderOverlay, paintValues:paintValues, esc:esc,
+ cfg:function(){ return cfg; },
+ setCfg:function(c){ cfg=c; },
+ data:function(){ return DATA; },
+ setData:function(d){ DATA=d; },
+ ovEl:ovEl
+};
+window.StatsOverlay={
+ set:function(stat,platform,name,amount){
+   setStat(stat,platform||"any",{name:name||"",amount:amount||"",detail:String(amount||""),months:"",tier:"",message:""});
+ },
+ config:function(){ return cfg; }, data:function(){ return DATA; }, reconnect:function(){ SB.connect(); }
+};
+})();
+</script>
+
+<!-- ======================= EDITOR (not exported) ======================= -->
+<script id="uijs">
+(function(){
+"use strict";
+var S=window.SSO;
+if(!S || S.MODE!=="edit" || !document.getElementById("editor")) return;
+
+var cfg=S.cfg(), DATA=S.data();
+var esc=S.esc, clone=S.clone;
+var controls=document.getElementById("controls"), stage=document.getElementById("stage");
+stage.appendChild(document.getElementById("ovwrap"));
+
+/* ---------- logging / status hooks ---------- */
+var logBuf=[];
+function paintLog(){
+  var el=document.getElementById("log"); if(!el) return;
+  el.innerHTML=logBuf.slice(-150).map(function(l){
+    return '<span class="dm">'+l.t+'</span> <span class="'+l.c+'">'+esc(l.m)+'</span>'; }).join("\n");
+  el.scrollTop=el.scrollHeight;
+}
+S.hooks.log=function(m,c){
+  if(!m) return;
+  logBuf.push({t:new Date().toLocaleTimeString(),m:m,c:c||"dm"});
+  if(logBuf.length>400) logBuf.shift();
+  paintLog();
+};
+S.hooks.conn=function(on){
+  var p=document.getElementById("connPill");
+  if(p){ p.className="pill "+(on?"on":"off"); p.textContent="Streamer.bot: "+(on?"connected":"offline"); }
+};
+S.hooks.data=function(){ if(curTab==="data") renderControls(); };
+
+function toast(msg,kind){
+  var t=document.createElement("div"); t.textContent=msg;
+  t.style.cssText="position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:"+
+   (kind==="er"?"#7f1d1d":"#14532d")+";color:#fff;padding:9px 16px;border-radius:8px;font-size:13px;z-index:9999;box-shadow:0 6px 24px rgba(0,0,0,.5)";
+  document.body.appendChild(t); setTimeout(function(){ t.remove(); },2300);
+}
+function rerender(){ S.renderOverlay(); updatePvSize(); }
+
+/* ---------- control helpers ---------- */
+function getPath(p){ var a=p.split("."),c=cfg; for(var i=0;i<a.length;i++){ if(c==null) return undefined; c=c[a[i]]; } return c; }
+function setPath(p,v){ var a=p.split("."),c=cfg; for(var i=0;i<a.length-1;i++){ if(c[a[i]]===undefined) c[a[i]]={}; c=c[a[i]]; } c[a[a.length-1]]=v; }
+function rowHTML(l,i){ return '<div class="row"><label>'+l+'</label><div class="in">'+i+'</div></div>'; }
+function iText(p,ph){ return '<input type="text" data-p="'+p+'" value="'+esc(getPath(p)||"")+'" placeholder="'+(ph||"")+'">'; }
+function iNum(p,mn,mx,st){ return '<input type="range" data-p="'+p+'" min="'+mn+'" max="'+mx+'" step="'+(st||1)+'" value="'+(getPath(p)||0)+'">'+
+  '<input type="number" class="num" data-p="'+p+'" min="'+mn+'" max="'+mx+'" step="'+(st||1)+'" value="'+(getPath(p)||0)+'">'; }
+function iNumOnly(p,mn,mx){ return '<input type="number" class="num" data-p="'+p+'" min="'+mn+'" max="'+mx+'" value="'+(getPath(p)||0)+'">'; }
+function iColor(p){ return '<input type="color" data-p="'+p+'" value="'+(getPath(p)||"#000000")+'"><input type="text" data-p="'+p+'" value="'+(getPath(p)||"")+'" style="width:90px">'; }
+function iChk(p,l){ return '<label class="flex" style="gap:6px;font-size:12px"><input type="checkbox" data-p="'+p+'"'+(getPath(p)?" checked":"")+'> '+(l||"")+'</label>'; }
+function iSel(p,opts){
+  var cur=getPath(p);
+  return '<select data-p="'+p+'">'+opts.map(function(o){
+    var v=(typeof o==="string")?o:o.v, n=(typeof o==="string")?o:o.n;
+    return '<option value="'+esc(v)+'"'+(String(cur)===String(v)?" selected":"")+'>'+esc(n)+'</option>'; }).join("")+'</select>';
+}
+var fontFilter="";
+function fontSelect(path){
+  var cur=getPath(path), extra=String(cfg.font.extra||"").split(",").map(function(s){return s.trim();}).filter(Boolean);
+  var f=fontFilter.toLowerCase();
+  function keep(list){ return f ? list.filter(function(x){ return x.toLowerCase().indexOf(f)>=0; }) : list; }
+  function grp(label,list){
+    if(!list.length) return "";
+    return '<optgroup label="'+label+'">'+list.map(function(n){
+      return '<option value="'+esc(n)+'"'+(cur===n?" selected":"")+'>'+esc(n)+'</option>'; }).join("")+'</optgroup>';
+  }
+  var mine=[]; if(cfg.font.customName) mine.push(cfg.font.customName);
+  mine=mine.concat(extra);
+  var win=keep(S.WINDOWS_FONTS), goo=keep(S.GOOGLE_FONTS), my=keep(mine);
+  var h='<select data-p="'+path+'">';
+  if(my.length) h+=grp("Your fonts",my);
+  h+=grp("Windows ("+win.length+")",win);
+  h+=grp("Google ("+goo.length+")",goo);
+  if(cur && win.indexOf(cur)<0 && goo.indexOf(cur)<0 && my.indexOf(cur)<0) h+=grp("Currently used",[cur]);
+  return h+'</select>';
+}
+function fontPreview(which){
+  var t=cfg[which];
+  return '<div style="margin:4px 0 10px;padding:10px;background:#070a0f;border:1px solid var(--ui-line);'+
+    'border-radius:8px;text-align:center;overflow:hidden;white-space:nowrap;'+
+    'font-family:\''+esc(t.font)+'\',Impact,sans-serif;font-weight:'+t.weight+';font-size:'+
+    Math.min(32,t.size)+'px;color:'+t.color+';letter-spacing:'+t.ls+'px;'+
+    (t.upper?"text-transform:uppercase;":"")+'">Latest Follower · NovaKnight</div>';
+}
+function tabFonts(){
+  return group("Pick a font",
+    rowHTML("Search",'<input type="text" id="fontSearch" value="'+esc(fontFilter)+'" placeholder="type to filter all '+(S.WINDOWS_FONTS.length+S.GOOGLE_FONTS.length)+' fonts">')+
+    '<div class="row"><label>Title font</label><div class="in">'+fontSelect("title.font")+'</div></div>'+
+    fontPreview("title")+
+    '<div class="row"><label>Value font</label><div class="in">'+fontSelect("value.font")+'</div></div>'+
+    fontPreview("value")+
+    '<p class="hint"><b>'+S.WINDOWS_FONTS.length+'</b> Windows fonts and <b>'+S.GOOGLE_FONTS.length+
+    '</b> Google fonts. Windows ones need no internet; Google ones are downloaded when the overlay loads.</p>')+
+   group("Add more fonts",
+    rowHTML("Load web fonts",iChk("font.google"))+
+    rowHTML("Extra Google fonts",iText("font.extra","Anton, Rubik Glitch"))+
+    rowHTML("Custom font name",iText("font.customName","MyFont"))+
+    rowHTML("Custom font file",iText("font.customFile","myfont.ttf"))+
+    '<p class="hint">Any Google font not in the list: type its exact name in "Extra Google fonts" (comma separated) and it joins the dropdowns. For a font file, drop the .ttf / .otf / .woff2 in this folder, name it here, then pick that name above.</p>');
+}
+function group(t,b,closed){ return '<div class="grp'+(closed?" closed":"")+'"><h3>'+t+'<span>▾</span></h3><div class="body">'+b+'</div></div>'; }
+function textBlock(ns){
+  return rowHTML("Font",fontSelect(ns+".font"))+
+    rowHTML("Size",iNum(ns+".size",8,140))+
+    rowHTML("Weight",iSel(ns+".weight",[{v:400,n:"Normal"},{v:600,n:"Semibold"},{v:700,n:"Bold"},{v:800,n:"Extra bold"},{v:900,n:"Black"}]))+
+    rowHTML("Colour",iColor(ns+".color"))+
+    rowHTML("Gradient",iChk(ns+".grad","on")+iColor(ns+".color2"))+
+    rowHTML("Outline",iNum(ns+".outline",0,12,0.5)+iColor(ns+".outlineColor"))+
+    rowHTML("Glow",iNum(ns+".glow",0,40))+
+    rowHTML("Glow colour",iColor(ns+".glowColor"))+
+    rowHTML("Letter space",iNum(ns+".ls",-3,20,0.5))+
+    rowHTML("Italic / skew",iNum(ns+".skew",-30,30))+
+    rowHTML("UPPERCASE",iChk(ns+".upper"));
+}
+
+/* ---------- tabs ---------- */
+function tabPanels(){
+  var h='<div class="flex" style="margin-bottom:10px"><button class="btn sm pri" id="addPanel">+ Add panel</button>'+
+        '<button class="btn sm" id="dupLast">Duplicate last</button></div>';
+  (cfg.panels||[]).forEach(function(p,i){
+    var pl=S.PLATFORMS.filter(function(x){return x.id===p.platform;})[0]||S.PLATFORMS[3];
+    var st=S.STATS.filter(function(x){return x.id===p.stat;})[0]||S.STATS[0];
+    h+='<div class="pcard closed" data-i="'+i+'"><div class="phead">'+
+      '<input type="checkbox" data-p="panels.'+i+'.on"'+(p.on?" checked":"")+'>'+
+      '<b>'+esc(p.label||"(no title)")+'</b><span class="tag '+pl.cls+'">'+esc(pl.name)+'</span>'+
+      '<span class="tag">'+esc(st.name.replace("Latest ",""))+'</span><span>▾</span></div><div class="pbody">'+
+      rowHTML("Title text",iText("panels."+i+".label","LASTEST FOLLOWER"))+
+      rowHTML("Platform",iSel("panels."+i+".platform",S.PLATFORMS.map(function(x){return {v:x.id,n:x.name};})))+
+      rowHTML("Shows",iSel("panels."+i+".stat",S.STATS.map(function(x){return {v:x.id,n:x.name};})))+
+      rowHTML("Show amount",iChk("panels."+i+".showAmount","bits / viewers / months / tip next to the name"))+
+      rowHTML("Format",iText("panels."+i+".fmt",st.fmt))+
+      rowHTML("Banner file",iText("panels."+i+".banner","(blank = global)"))+
+      rowHTML("Design id",iText("panels."+i+".preset","(blank = global, e.g. hex|ember)"))+
+      rowHTML("Title colour",iText("panels."+i+".titleColor","(blank = global)"))+
+      rowHTML("Value colour",iText("panels."+i+".valueColor","(blank = global)"))+
+      rowHTML("Size override",iNumOnly("panels."+i+".w",0,2000)+iNumOnly("panels."+i+".h",0,1000)+'<span class="hint" style="margin:0">w / h, 0 = global</span>')+
+      '<div class="flex" style="margin-top:8px">'+
+       '<button class="btn sm" data-act="test" data-i="'+i+'">Test this</button>'+
+       '<button class="btn sm" data-act="up" data-i="'+i+'">↑</button>'+
+       '<button class="btn sm" data-act="down" data-i="'+i+'">↓</button>'+
+       '<button class="btn sm danger" data-act="del" data-i="'+i+'">Delete</button></div></div></div>';
+  });
+  return h+'<p class="hint">Tokens: <code>{name}</code> <code>{amount}</code> <code>{detail}</code> <code>{months}</code> <code>{tier}</code> <code>{message}</code>. Blank format = the default for that stat.</p>';
+}
+function tabTitle(){
+  return group("Title text",textBlock("title"))+
+   group("Placement",
+    rowHTML("Show titles",iChk("title.on"))+
+    rowHTML("Position",iSel("title.pos",[{v:"above",n:"Above the banner"},{v:"inside",n:"Inside, top"},{v:"below",n:"Below the banner"},{v:"hidden",n:"Hidden"}]))+
+    rowHTML("Gap",iNum("title.gap",-30,40))+
+    rowHTML("Inside offset",iNum("title.offset",-40,60)));
+}
+function tabValue(){
+  return group("Value text",textBlock("value"))+
+   group("Fitting",
+    rowHTML("Align",iSel("value.align",["left","center","right"]))+
+    rowHTML("Long names",iSel("value.overflow",[{v:"shrink",n:"Shrink to fit"},{v:"scroll",n:"Scroll / marquee"},{v:"clip",n:"Cut off with …"}]))+
+    rowHTML("Min size",iNum("value.minSize",6,40)))+
+   group("Second line",
+    rowHTML("Show",iChk("sub.on"))+
+    rowHTML("Content",iSel("sub.mode",[{v:"detail",n:"Amount / detail"},{v:"timeago",n:"How long ago"},{v:"both",n:"Both"}]))+
+    rowHTML("Size",iNum("sub.size",7,40))+rowHTML("Colour",iColor("sub.color"))+
+    rowHTML("Opacity",iNum("sub.opacity",0.1,1,0.05))+rowHTML("Gap",iNum("sub.gap",0,20)),true)+
+   group("Platform badge",
+    rowHTML("Style",iSel("badge.mode",[{v:"none",n:"None"},{v:"dot",n:"Coloured dot"},{v:"text",n:"Short text"},{v:"image",n:"Image file"}]))+
+    rowHTML("Size",iNum("badge.size",8,64))+
+    rowHTML("Side",iSel("badge.pos",[{v:"left",n:"Left"},{v:"right",n:"Right"}]))+
+    rowHTML("Twitch img",iText("badge.img.twitch","twitch.png"))+
+    rowHTML("Kick img",iText("badge.img.kick","kick.png"))+
+    rowHTML("YouTube img",iText("badge.img.youtube","youtube.png")),true);
+}
+function tabBanner(){
+  return group("Source",
+    rowHTML("Use",iSel("banner.mode",[{v:"image",n:"Image file in this folder"},{v:"preset",n:"Built-in design"}]))+
+    rowHTML("File name",iText("banner.src","banner_background.png"))+
+    '<div class="drop" id="dropzone">Drag a PNG here to preview it and set the file name</div>'+
+    '<p class="hint">With <b>Built-in design</b> (or an empty file name) the Banner designs tab takes over — no image needed.</p>')+
+   group("Box",
+    rowHTML("Width",iNum("banner.w",40,1400))+
+    rowHTML("Height",iNum("banner.h",20,600))+
+    rowHTML("Image fit",iSel("banner.fit",[{v:"100% 100%",n:"Stretch to box"},{v:"contain",n:"Contain"},{v:"cover",n:"Cover"},{v:"auto",n:"Original size"}]))+
+    rowHTML("Corner radius",iNum("banner.radius",0,60))+
+    rowHTML("Frame width",iNum("banner.frame",0,20))+
+    rowHTML("Opacity",iNum("banner.opacity",0.1,1,0.05)))+
+   group("Text area inside",
+    rowHTML("Pad left",iNum("banner.pl",0,200))+rowHTML("Pad right",iNum("banner.pr",0,200))+
+    rowHTML("Pad top",iNum("banner.pt",0,100))+rowHTML("Pad bottom",iNum("banner.pb",0,100))+
+    '<p class="hint">Use these so the name sits inside the dark middle of your art.</p>')+
+   group("Extras",
+    rowHTML("Fill colour",iChk("banner.bgOn")+iColor("banner.bg"))+
+    rowHTML("Border",iNum("banner.bw",0,12)+iColor("banner.bc"))+
+    rowHTML("Outer glow",iChk("banner.glowOn")+iColor("banner.glowColor"))+
+    rowHTML("Glow size",iNum("banner.glow",0,60)),true);
+}
+var galShape="", galTheme="";
+function tabDesigns(){
+  var list=S.presetList().filter(function(p){
+    return (!galShape||p.shape.id===galShape)&&(!galTheme||p.theme.id===galTheme);
+  });
+  var cur=cfg.banner.preset;
+  var bar='<div class="galbar">'+
+    '<select id="fShape"><option value="">All shapes ('+S.SHAPES.length+')</option>'+
+      S.SHAPES.map(function(s){return '<option value="'+s.id+'"'+(galShape===s.id?" selected":"")+'>'+esc(s.name)+'</option>';}).join("")+'</select>'+
+    '<select id="fTheme"><option value="">All colours ('+S.THEMES.length+')</option>'+
+      S.THEMES.map(function(t){return '<option value="'+t.id+'"'+(galTheme===t.id?" selected":"")+'>'+esc(t.name)+'</option>';}).join("")+'</select>'+
+    '</div>';
+  var cells=list.map(function(p){
+    var css=S.presetCSS(p,cfg.banner.frame,cfg.banner.radius,cfg.banner.custom);
+    return '<div class="gcell'+(cur===p.id?" sel":"")+'" data-preset="'+p.id+'" title="'+esc(p.name)+' — '+p.id+'">'+
+      '<div class="mini" style="position:absolute;'+css.outer+'">'+
+      '<div style="position:absolute;'+css.after.replace("content:'';","")+'"></div></div></div>';
+  }).join("");
+  return group("Built-in banner designs — "+S.presetList().length+" to choose from",
+    (cfg.banner.mode==="image"&&cfg.banner.src ? '<div class="warn">A banner image is set, so these are not being used. Switch <b>Banner → Use</b> to "Built-in design" (or clear the file name) to turn them on.</div>' : '')+
+    bar+'<div class="gal" id="gal">'+cells+'</div>'+
+    '<p class="hint">Showing '+list.length+' of '+S.presetList().length+'. Selected: <code>'+esc(cur||"none")+'</code>. '+
+    'Frame width, corner radius and the box size come from the Banner tab. A panel can use its own design by putting the id in its "Design id" box.</p>')+
+   group("Your own colours",
+    rowHTML("Use my colours",iChk("banner.custom.on","override the design's colours"))+
+    rowHTML("Frame top",iColor("banner.custom.f1"))+
+    rowHTML("Frame bottom",iColor("banner.custom.f2"))+
+    rowHTML("Inside top",iColor("banner.custom.b1"))+
+    rowHTML("Inside bottom",iColor("banner.custom.b2"))+
+    rowHTML("Frame angle",iNum("banner.custom.angle",0,360,5))+
+    rowHTML("Outer glow",iColor("banner.glowColor"))+
+    '<div class="flex" style="margin-top:6px">'+
+      S.THEMES.map(function(t){ return '<button class="btn sm" data-act="steal" data-theme="'+t.id+'" '+
+        'style="border-color:'+t.f[0]+';color:'+t.f[0]+'">'+esc(t.name)+'</button>'; }).join("")+'</div>'+
+    '<p class="hint">With this on, the grid above becomes a pure shape picker — every thumbnail uses your colours. '+
+    'The buttons copy a built-in palette into the pickers so you can tweak from there.</p>');
+}
+function tabLayout(){
+  return group("Arrangement",
+    rowHTML("Direction",iSel("layout.dir",[{v:"row",n:"Side by side"},{v:"column",n:"Stacked"},{v:"grid",n:"Grid"}]))+
+    rowHTML("Grid columns",iNum("layout.cols",1,8))+
+    rowHTML("Gap",iNum("layout.gap",0,200))+
+    rowHTML("Align",iSel("layout.align",[{v:"center",n:"Center"},{v:"flex-start",n:"Start"},{v:"flex-end",n:"End"}]))+
+    rowHTML("Outer padding",iNum("layout.pad",0,120))+
+    rowHTML("Wrap",iChk("layout.wrap"))+
+    rowHTML("Overall scale",iNum("layout.scale",0.2,3,0.05)))+
+   group("Behaviour",
+    rowHTML("Empty text",iText("behavior.idleText","—"))+
+    rowHTML("Hide if empty",iChk("behavior.hideEmpty"))+
+    rowHTML("Status chip",iChk("behavior.showChip","show in overlay"))+
+    rowHTML("Chip corner",iSel("behavior.chipPos",["bottom-right","bottom-left","top-right","top-left"]))+
+    rowHTML("Bake values",iChk("behavior.bakeValues","copy the current names into the exported overlay"))+
+    '<p class="hint">With bake on, an exported overlay already knows the last follower, sub, cheer and raid on its very first run — handy on a new PC or after clearing the OBS cache.</p>');
+}
+function tabFX(){
+  return group("When the value changes",
+    rowHTML("Animation",iSel("fx.anim",[{v:"pop",n:"Pop"},{v:"fade",n:"Fade"},{v:"up",n:"Slide up"},{v:"down",n:"Slide down"},
+      {v:"left",n:"Slide in from right"},{v:"right",n:"Slide in from left"},{v:"flip",n:"Flip"},{v:"zoom",n:"Zoom blur"},
+      {v:"glitch",n:"Glitch"},{v:"none",n:"None"}]))+
+    rowHTML("Duration",iNum("fx.dur",100,3000,50))+
+    rowHTML("Banner flash",iChk("fx.flash")+iColor("fx.flashColor"))+
+    rowHTML("Banner shake",iChk("fx.shake"))+
+    rowHTML("Idle pulse",iChk("fx.idle","always animate the banner"))+
+    '<p class="hint">The animation only runs when the text on a panel actually changes — a new follower plays it, a reconnect or a repeated event does not. Idle pulse is the one exception, it loops on purpose.</p>')+
+   group("Fonts",
+    rowHTML("Load web fonts",iChk("font.google"))+
+    rowHTML("Extra Google fonts",iText("font.extra","Anton, Rubik Glitch"))+
+    rowHTML("Custom font name",iText("font.customName","MyFont"))+
+    rowHTML("Custom font file",iText("font.customFile","myfont.ttf"))+
+    '<p class="hint">The lists hold '+S.WINDOWS_FONTS.length+' Windows fonts and '+S.GOOGLE_FONTS.length+' Google fonts. Any other Google font works too — type its exact name in "Extra Google fonts" (comma separated) and it joins the dropdown. A .ttf/.otf/.woff2 in this folder works through the custom font boxes.</p>');
+}
+function tabConn(){
+  return group("Connection",
+    rowHTML("Enabled",iChk("conn.enabled"))+
+    rowHTML("WebSocket URL",iText("conn.url","ws://127.0.0.1:8080/"))+
+    rowHTML("Password",iText("conn.password","(only if auth is on)"))+
+    rowHTML("Auto reconnect",iChk("conn.reconnect"))+
+    rowHTML("Retry every",iNum("conn.reconnectMs",1000,60000,500))+
+    '<div class="flex" style="margin-top:8px"><button class="btn sm pri" id="btnConnect">Reconnect now</button>'+
+    '<button class="btn sm" id="btnDisconnect">Disconnect</button></div>'+
+    '<p class="hint">Streamer.bot → <b>Servers/Clients → WebSocket Server</b> → Enabled. Address <code>127.0.0.1</code>, port <code>8080</code>, endpoint <code>/</code>.</p>')+
+   group("Event log",'<div id="log"></div><p class="hint">Everything Streamer.bot sends shows here, mapped or not.</p>')+
+   group("Extra event mappings",
+    '<textarea id="mapsBox" rows="7" spellcheck="false">'+esc(JSON.stringify(cfg.maps||[],null,1))+'</textarea>'+
+    '<div class="flex" style="margin-top:8px"><button class="btn sm" id="saveMaps">Apply mappings</button></div>'+
+    '<p class="hint">Shape: <code>[{"event":"Kick.RewardRedemption","stat":"custom","platform":"kick","namePath":"user.username"}]</code></p>',true);
+}
+function tabData(){
+  var rows="",keys=Object.keys(S.data().stats);
+  if(!keys.length) rows='<tr><td colspan="4" class="hint">Nothing stored yet.</td></tr>';
+  keys.sort().forEach(function(k){
+    var r=S.data().stats[k];
+    rows+='<tr><td><code>'+esc(k)+'</code></td><td>'+esc(r.vars.name||"")+'</td><td>'+esc(String(r.vars.amount||""))+'</td>'+
+      '<td style="white-space:nowrap">'+S.timeAgo(r.ts)+' <button class="btn sm" data-act="undo" data-k="'+esc(k)+'">undo</button> '+
+      '<button class="btn sm danger" data-act="clr" data-k="'+esc(k)+'">x</button></td></tr>';
+  });
+  var manual=(cfg.panels||[]).map(function(p,i){
+    var rec=S.getStat(p.platform,p.stat);
+    return rowHTML(esc(p.label||p.id),
+      '<input type="text" class="manName" data-i="'+i+'" placeholder="name" value="'+esc(rec?rec.vars.name:"")+'">'+
+      '<input type="text" class="manAmt" data-i="'+i+'" placeholder="amount" style="width:90px" value="'+esc(rec?String(rec.vars.amount||""):"")+'">');
+  }).join("");
+  return group("Set values by hand",manual+
+    '<div class="flex"><button class="btn sm pri" id="applyManual">Apply to overlay</button>'+
+    '<button class="btn sm" id="seedManual">Also save as startup values</button></div>')+
+   group("Stored data",
+    '<table class="data"><thead><tr><th>key</th><th>name</th><th>amount</th><th>updated</th></tr></thead><tbody>'+rows+'</tbody></table>'+
+    '<div class="flex" style="margin-top:10px"><button class="btn sm" id="dataExport">Export data</button>'+
+    '<button class="btn sm" id="dataImport">Import data</button>'+
+    '<button class="btn sm danger" id="dataClear">Clear all</button></div>'+
+    '<p class="hint">Streamer.bot last seen: <b>'+S.timeAgo(S.data().meta.lastSeen||S.data().meta.lastOnline)+'</b>'+
+    (S.data().meta.lastOnline?' ('+new Date(S.data().meta.lastOnline).toLocaleString()+')':'')+
+    '<br>Values live in this browser, so they survive Streamer.bot and OBS restarts.</p>');
+}
+function tabSetup(){
+  return '<div class="help">'+
+  '<h4>Fastest route into OBS</h4>'+
+  '<p>Click <b>Export overlay HTML</b> in the top bar. That writes <code>overlay.html</code> — the overlay only, with your design baked in, no editor, no config file needed. Put it in this same folder (it still reads <code>banner_background.png</code> and any badge/font files from there), then in OBS add a Browser source, tick <b>Local file</b> and pick it.</p>'+
+  '<p>The other two routes still work if you prefer to keep one file: <b>overlay-config.js</b> (drop next to this HTML) or <b>Copy OBS URL</b> (paste into the browser source with Local file unticked).</p>'+
+  '<h4>Files in the folder</h4>'+
+  '<ul><li><code>stream-stats-overlay.html</code> — the customizer (this file)</li>'+
+  '<li><code>overlay.html</code> — the exported overlay for OBS</li>'+
+  '<li><code>banner_background.png</code> — optional; without it the '+S.presetList().length+' built-in designs take over</li>'+
+  '<li>optional badge images and font files</li></ul>'+
+  '<p>Suggested source size: width <b id="sugW">1400</b>, height <b id="sugH">200</b>. Leave "Shutdown source when not visible" off so the stored values stay loaded.</p>'+
+  '<h4>Streamer.bot</h4>'+
+  '<ol><li><b>Servers/Clients → WebSocket Server</b> → Enabled + Auto Start.</li>'+
+  '<li>Address <code>127.0.0.1</code>, port <code>8080</code>, endpoint <code>/</code>.</li>'+
+  '<li>If Authentication is on, put the same password in the Streamer.bot tab.</li>'+
+  '<li>Link your Twitch, Kick and YouTube accounts in Streamer.bot as usual.</li></ol>'+
+  '<p>No actions or import strings needed. It subscribes to these itself:</p>'+
+  '<pre>Twitch   Follow, Sub, ReSub, GiftSub, GiftBomb, Cheer, Raid, ChatMessage, FirstWords\nKick     Follow, Subscription, Resubscription, GiftSubscription, MassGiftSubscription, ChatMessage, ViewerCountUpdate\nYouTube  NewSubscriber, NewSponsor, MembershipGift, SuperChat, SuperSticker, MemberMileStone, Message, StatisticsUpdated\nTips     Streamlabs.Donation, StreamElements.Tip</pre>'+
+  '<h4>Feeding anything else</h4>'+
+  '<p>Add an <b>Execute C# Code</b> sub-action to any action:</p>'+
+  '<pre>using System;\n\npublic class CPHInline\n{\n    public bool Execute()\n    {\n        string name = args.ContainsKey("user") ? args["user"].ToString() : "";\n        string json = "{\\"ssbOverlay\\":true,"\n                    + "\\"stat\\":\\"follower\\","    // follower, subscriber, giftsub, cheer, raid,\n                    + "\\"platform\\":\\"kick\\","     // superchat, donation, viewers, chatter, custom\n                    + "\\"name\\":\\"" + name + "\\","\n                    + "\\"amount\\":\\"\\"}";\n        CPH.WebsocketBroadcastJson(json);\n        return true;\n    }\n}</pre>'+
+  '<h4>Streaming to more than one platform</h4>'+
+  '<p>Panels ship set to <b>Any platform</b>, so one "Latest Follower" box covers Twitch, Kick and YouTube at once — whoever followed last wins, whichever site they came from. Same for subs, cheers and raids. Turn on a platform badge in the Value text tab and an Any-platform panel shows the badge of the site the current name came from. If you would rather have one box per site, set a panel to a single platform and add more panels.</p>'+
+  '<h4>Effects</h4>'+
+  '<p>An effect fires only when a panel\'s text changes. Reconnecting, reloading the source, repainting or an identical repeat event will not replay it, so an idle overlay stays still.</p>'+
+  '<h4>Remembering data</h4>'+
+  '<p>Every value is written to the browser source\'s storage as it arrives, with a timestamp and the last time Streamer.bot was seen. Close Streamer.bot, restart OBS, reboot — the panels still show the last follower, sub, cheer and raid.</p>'+
+  '<h4>Troubleshooting</h4>'+
+  '<ul><li><b>Banner missing in OBS:</b> file name is case sensitive and must be in the same folder as the overlay HTML.</li>'+
+  '<li><b>Nothing updates:</b> check the Event log. Events arriving but panels unchanged means the panel platform/stat does not match the event.</li>'+
+  '<li><b>A Google font does not apply:</b> the name must match Google\'s spelling exactly.</li></ul></div>';
+}
+var TABS={panels:tabPanels,fonts:tabFonts,title:tabTitle,value:tabValue,banner:tabBanner,designs:tabDesigns,
+          layout:tabLayout,fx:tabFX,conn:tabConn,data:tabData,setup:tabSetup};
+var curTab="panels";
+function renderControls(){
+  controls.innerHTML=TABS[curTab]();
+  if(curTab==="conn") paintLog();
+  if(curTab==="designs") sizeGallery();
+  if(curTab==="setup"){
+    var r=S.ovEl.getBoundingClientRect();
+    var w=document.getElementById("sugW"),h=document.getElementById("sugH");
+    if(w) w.textContent=Math.ceil(r.width+20);
+    if(h) h.textContent=Math.ceil(r.height+20);
+  }
+  wireDropzone();
+}
+function sizeGallery(){
+  var first=controls.querySelector(".gcell"); if(!first) return;
+  var s=first.clientWidth/330;
+  controls.querySelectorAll(".gcell").forEach(function(c){ c.style.height=Math.round(74*s)+"px"; });
+  controls.querySelectorAll(".mini").forEach(function(m){ m.style.transform="scale("+s+")"; });
+}
+function updatePvSize(){
+  var el=document.getElementById("pvsize"); if(!el) return;
+  var r=S.ovEl.getBoundingClientRect();
+  el.textContent=Math.ceil(r.width)+" x "+Math.ceil(r.height)+" px";
+}
+function refreshHeads(){
+  controls.querySelectorAll(".pcard").forEach(function(card){
+    var i=+card.getAttribute("data-i"), p=cfg.panels[i]; if(!p) return;
+    var pl=S.PLATFORMS.filter(function(x){return x.id===p.platform;})[0]||S.PLATFORMS[3];
+    var st=S.STATS.filter(function(x){return x.id===p.stat;})[0]||S.STATS[0];
+    var head=card.querySelector(".phead");
+    head.querySelector("b").textContent=p.label||"(no title)";
+    var tags=head.querySelectorAll(".tag");
+    if(tags[0]){ tags[0].className="tag "+pl.cls; tags[0].textContent=pl.name; }
+    if(tags[1]) tags[1].textContent=st.name.replace("Latest ","");
+  });
+}
+controls.addEventListener("input",function(e){
+  var el=e.target;
+  if(el.id==="fontSearch"){
+    fontFilter=el.value;
+    ["title.font","value.font"].forEach(function(p){
+      var s=controls.querySelector('select[data-p="'+p+'"]');
+      if(s) s.outerHTML=fontSelect(p);
+    });
+    return;
+  }
+  var path=el.getAttribute("data-p"); if(!path) return;
+  var v;
+  if(el.type==="checkbox") v=el.checked;
+  else if(el.type==="number"||el.type==="range") v=parseFloat(el.value);
+  else if(el.tagName==="SELECT"&&typeof getPath(path)==="number") v=parseFloat(el.value);
+  else v=el.value;
+  setPath(path,v);
+  controls.querySelectorAll('[data-p="'+path+'"]').forEach(function(o){
+    if(o===el) return;
+    if(o.type==="checkbox") o.checked=!!getPath(path); else o.value=getPath(path);
+  });
+  rerender();
+  if(path.indexOf("panels.")===0) refreshHeads();
+  if(path==="banner.mode"||path==="banner.src"||path.indexOf("banner.custom")===0){ if(curTab==="designs") renderControls(); }
+  if(curTab==="fonts"&&(path==="title.font"||path==="value.font")) renderControls();
+});
+controls.addEventListener("change",function(e){
+  var el=e.target;
+  if(el.id==="fShape"){ galShape=el.value; renderControls(); }
+  if(el.id==="fTheme"){ galTheme=el.value; renderControls(); }
+});
+controls.addEventListener("click",function(e){
+  var t=e.target;
+  var cell=t.closest?t.closest(".gcell"):null;
+  if(cell){
+    cfg.banner.preset=cell.getAttribute("data-preset");
+    if(cfg.banner.mode==="image"&&!cfg.banner.src) cfg.banner.mode="preset";
+    rerender(); renderControls(); return;
+  }
+  if(t.tagName==="H3"||(t.parentNode&&t.parentNode.tagName==="H3")){
+    var g=t.closest(".grp"); if(g){ g.classList.toggle("closed"); return; }
+  }
+  if(t.closest(".phead")&&t.tagName!=="INPUT"){ t.closest(".pcard").classList.toggle("closed"); return; }
+
+  if(t.id==="addPanel"){ cfg.panels.push(S.mkPanel(Date.now()%100000,"twitch","follower","NEW PANEL")); rerender(); renderControls(); return; }
+  if(t.id==="dupLast"){ var l=cfg.panels[cfg.panels.length-1];
+    if(l){ var c=clone(l); c.id="p"+(Date.now()%100000); cfg.panels.push(c); rerender(); renderControls(); } return; }
+  if(t.id==="btnConnect"){ S.SB.connect(); return; }
+  if(t.id==="btnDisconnect"){ S.SB.disconnect(); return; }
+  if(t.id==="saveMaps"){
+    try{ var m=JSON.parse(document.getElementById("mapsBox").value||"[]");
+      if(!Array.isArray(m)) throw new Error("must be a list");
+      cfg.maps=m; toast("Mappings applied","ok"); if(S.SB.connected) S.SB.subscribe();
+    }catch(err){ toast("Bad JSON: "+err.message,"er"); } return;
+  }
+  if(t.id==="applyManual"||t.id==="seedManual"){
+    var seed=(t.id==="seedManual");
+    controls.querySelectorAll(".manName").forEach(function(inp){
+      var i=+inp.getAttribute("data-i"),p=cfg.panels[i]; if(!p) return;
+      var amt=controls.querySelector('.manAmt[data-i="'+i+'"]');
+      if(!inp.value&&!(amt&&amt.value)) return;
+      var vars={name:inp.value,amount:amt?amt.value:"",detail:amt?amt.value:"",months:"",tier:"",message:""};
+      S.setStat(p.stat,p.platform,vars);
+      if(seed) cfg.seed[S.statKey(p.platform,p.stat)]=vars;
+    });
+    renderControls(); toast(seed?"Saved as startup values":"Applied","ok"); return;
+  }
+  if(t.id==="dataClear"){ if(confirm("Clear every stored value?")){ S.setData({stats:{},meta:S.data().meta}); S.saveData(); rerender(); renderControls(); } return; }
+  if(t.id==="dataExport"){ download("overlay-data.json",JSON.stringify(S.data(),null,2)); return; }
+  if(t.id==="dataImport"){ pickFile(function(txt){
+    try{ var d=JSON.parse(txt); S.setData({stats:d.stats||{},meta:d.meta||{lastOnline:0,lastSeen:0}});
+      S.saveData(); rerender(); renderControls(); toast("Data imported","ok"); }
+    catch(e){ toast("Bad file","er"); } }); return; }
+
+  var act=t.getAttribute("data-act"); if(!act) return;
+  var i=+t.getAttribute("data-i"), k=t.getAttribute("data-k");
+  if(act==="del"){ if(confirm("Delete this panel?")){ cfg.panels.splice(i,1); rerender(); renderControls(); } }
+  else if(act==="up"&&i>0){ var a=cfg.panels.splice(i,1)[0]; cfg.panels.splice(i-1,0,a); rerender(); renderControls(); }
+  else if(act==="down"&&i<cfg.panels.length-1){ var b=cfg.panels.splice(i,1)[0]; cfg.panels.splice(i+1,0,b); rerender(); renderControls(); }
+  else if(act==="test"){ testPanel(cfg.panels[i]); }
+  else if(act==="steal"){
+    var th=S.THEMES.filter(function(x){ return x.id===t.getAttribute("data-theme"); })[0];
+    if(th){ cfg.banner.custom.on=true; cfg.banner.custom.f1=th.f[0]; cfg.banner.custom.f2=th.f[1];
+            cfg.banner.custom.b1=th.b[0]; cfg.banner.custom.b2=th.b[1];
+            rerender(); renderControls(); }
+  }
+  else if(act==="clr"){ delete S.data().stats[k]; S.saveData(); rerender(); renderControls(); }
+  else if(act==="undo"){
+    var rec=S.data().stats[k];
+    if(rec&&rec.history&&rec.history.length){
+      var prev=rec.history.pop();
+      S.data().stats[k]={vars:prev.vars,ts:prev.ts,platform:prev.platform,history:rec.history};
+      S.saveData(); rerender(); renderControls();
+    }
+  }
+});
+function wireDropzone(){
+  var dz=document.getElementById("dropzone"); if(!dz) return;
+  ["dragenter","dragover"].forEach(function(ev){ dz.addEventListener(ev,function(e){ e.preventDefault(); dz.classList.add("hot"); }); });
+  ["dragleave","drop"].forEach(function(ev){ dz.addEventListener(ev,function(e){ e.preventDefault(); dz.classList.remove("hot"); }); });
+  dz.addEventListener("drop",function(e){
+    var f=e.dataTransfer.files&&e.dataTransfer.files[0]; if(!f) return;
+    cfg.banner.src=f.name; cfg.banner.mode="image";
+    renderControls(); rerender();
+    toast('Banner set to "'+f.name+'" — keep that file next to the overlay',"ok");
+  });
+}
+
+/* ---------- tests ---------- */
+var TEST_NAMES=["xXDragonSlayerXx","NovaKnight","pixel_priestess","Gl1tchW1tch","ToastedMarshmallow",
+ "Kr4kenKing","Mango_Mori","SynthWaveSam","QuietThunder","BiscuitOverlord"];
+function testPanel(p){
+  if(!p) return;
+  var v={name:TEST_NAMES[Math.floor(Math.random()*TEST_NAMES.length)],amount:"",detail:"",
+         months:String(1+Math.floor(Math.random()*40)),tier:"1",message:""};
+  if(p.stat==="cheer") v.amount=(100*(1+Math.floor(Math.random()*50)))+" bits";
+  else if(p.stat==="raid") v.amount=(2+Math.floor(Math.random()*400))+" viewers";
+  else if(p.stat==="giftsub") v.amount=String(1+Math.floor(Math.random()*20));
+  else if(p.stat==="subscriber") v.amount=v.months+" mo";
+  else if(p.stat==="superchat"||p.stat==="donation") v.amount="$"+(5*(1+Math.floor(Math.random()*8))).toFixed(2);
+  else if(p.stat==="viewers"){ v.name=""; v.amount=String(10+Math.floor(Math.random()*5000)); }
+  v.detail=String(v.amount);
+  S.setStat(p.stat,p.platform,v,{force:true});
+}
+document.getElementById("btnTest").onclick=function(){
+  (cfg.panels||[]).forEach(function(p,i){ setTimeout(function(){ testPanel(p); },i*260); });
+};
+
+/* ---------- top bar ---------- */
+function download(name,text,type){
+  var b=new Blob([text],{type:type||"text/plain;charset=utf-8"});
+  var a=document.createElement("a"); a.href=URL.createObjectURL(b); a.download=name;
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },1200);
+}
+function pickFile(cb){
+  var i=document.createElement("input"); i.type="file"; i.accept=".json,.js,text/plain";
+  i.onchange=function(){ var f=i.files[0]; if(!f) return; var r=new FileReader();
+    r.onload=function(){ cb(String(r.result)); }; r.readAsText(f); };
+  i.click();
+}
+function bakeCurrentValues(){
+  if(cfg.behavior.bakeValues===false) return;
+  var st=S.data().stats;
+  Object.keys(st).forEach(function(k){ if(st[k]&&st[k].vars&&st[k].vars.name) cfg.seed[k]=st[k].vars; });
+}
+function buildOverlayHTML(){
+  var ovcss=document.getElementById("ovcss").textContent;
+  var engine=document.getElementById("engine").textContent;
+  var safe=function(s){ return String(s).replace(/<\/script/gi,"<\\/script"); };
+  bakeCurrentValues();
+  cfg.savedAt=Date.now();
+  return "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n"+
+   "<title>Stream Stats Overlay</title>\n"+
+   "<!-- Overlay only. Generated "+new Date().toLocaleString()+" by stream-stats-overlay.html.\n"+
+   "     Keep this next to your banner / badge / font files. Re-export to change the design. -->\n"+
+   "<style>\n"+ovcss+"\n</style>\n</head>\n<body>\n"+
+   "<div id=\"ovwrap\"><div id=\"ov\"></div></div>\n"+
+   "<div id=\"sbchip\"><b></b><span>offline</span></div>\n"+
+   "<script>window.OVERLAY_EXPORT=true;window.OVERLAY_CONFIG="+safe(JSON.stringify(cfg))+";<\/script>\n"+
+   "<script>\n"+safe(engine)+"\n<\/script>\n</body>\n</html>\n";
+}
+document.getElementById("btnExportHtml").onclick=function(){
+  S.lsSet(S.CFG_KEY,cfg);
+  download("overlay.html",buildOverlayHTML(),"text/html;charset=utf-8");
+  toast("overlay.html exported — point OBS at it","ok");
+};
+document.getElementById("btnSave").onclick=function(){
+  cfg.savedAt=Date.now();
+  toast(S.lsSet(S.CFG_KEY,cfg)?"Saved to this browser":"Could not write local storage", S.lsSet(S.CFG_KEY,cfg)?"ok":"er");
+};
+document.getElementById("btnCfgFile").onclick=function(){
+  cfg.savedAt=Date.now(); S.lsSet(S.CFG_KEY,cfg);
+  download("overlay-config.js","/* Stream stats overlay — generated "+new Date().toLocaleString()+" */\nwindow.OVERLAY_CONFIG = "+JSON.stringify(cfg,null,1)+";\n","application/javascript");
+  toast("Put overlay-config.js next to the HTML","ok");
+};
+document.getElementById("btnUrl").onclick=function(){
+  cfg.savedAt=Date.now();
+  var url=location.href.split("#")[0].split("?")[0]+"#cfg="+S.b64e(cfg);
+  if(navigator.clipboard) navigator.clipboard.writeText(url).then(
+    function(){ toast("OBS URL copied ("+url.length+" chars)","ok"); },
+    function(){ prompt("Copy this URL into the OBS browser source:",url); });
+  else prompt("Copy this URL into the OBS browser source:",url);
+};
+document.getElementById("btnExport").onclick=function(){
+  cfg.savedAt=Date.now(); download("overlay-settings.json",JSON.stringify(cfg,null,2),"application/json");
+};
+document.getElementById("btnImport").onclick=function(){
+  pickFile(function(txt){
+    try{
+      var t=txt.replace(/^[\s\S]*?window\.OVERLAY_CONFIG\s*=\s*/,"").replace(/;\s*$/,"");
+      cfg=S.deepMerge(S.DEFAULTS,JSON.parse(t)); S.setCfg(cfg);
+      rerender(); renderControls(); toast("Settings loaded","ok");
+    }catch(e){ toast("Could not read that file","er"); }
+  });
+};
+document.getElementById("btnReset").onclick=function(){
+  if(!confirm("Reset the whole design back to defaults?")) return;
+  cfg=clone(S.DEFAULTS); S.setCfg(cfg); rerender(); renderControls();
+};
+document.querySelectorAll(".nav button").forEach(function(b){
+  b.onclick=function(){
+    document.querySelectorAll(".nav button").forEach(function(x){ x.classList.remove("act"); });
+    b.classList.add("act"); curTab=b.getAttribute("data-tab"); renderControls();
+  };
+});
+document.getElementById("pvbg").onchange=function(){ stage.className=this.value; };
+
+renderControls();
+setTimeout(updatePvSize,120);
+})();
+</script>
+</body>
+</html>
